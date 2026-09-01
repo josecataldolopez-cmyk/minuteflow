@@ -1,0 +1,1 @@
+{"name":"MinuteFlow","description":"Suite ejecutiva de gestión de actas de reuniones con dictado por voz, panel bento, biblioteca inteligente y exportación multicanal.","requestFramePermissions":["microphone"],"majorCapabilities":["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]}
