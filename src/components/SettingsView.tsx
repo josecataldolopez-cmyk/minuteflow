@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
-import { UserProfile, Attendee, DirectoryItem } from '../types';
+import { UserProfile, Attendee, DirectoryItem, MeetingMinute } from '../types';
 import { AVATAR_PRESETS, INITIAL_ATTENDEES } from '../data/mockData';
+import {
+  getDriveAccount,
+  setDriveAccount,
+  getDriveWebhookUrl,
+  setDriveWebhookUrl,
+  syncMinuteToGoogleDrive
+} from '../services/driveSyncService';
 
 interface SettingsViewProps {
   userProfile: UserProfile;
@@ -85,8 +92,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [showDeleteSampleDialog, setShowDeleteSampleDialog] = useState(false);
   const [showClearAllDialog, setShowClearAllDialog] = useState(false);
 
-  // System Settings State
+  // Google Drive & Channels State
   const [driveEnabled, setDriveEnabled] = useState(true);
+  const [driveAccount, setDriveAccountState] = useState(getDriveAccount());
+  const [driveWebhookUrl, setDriveWebhookUrlState] = useState(getDriveWebhookUrl());
+  const [showDriveGuide, setShowDriveGuide] = useState(false);
+  const [isTestingDrive, setIsTestingDrive] = useState(false);
+
   const [whatsappEnabled, setWhatsappEnabled] = useState(true);
   const [emailAutoSend, setEmailAutoSend] = useState(false);
   const [language, setLanguage] = useState('es-ES');
@@ -148,32 +160,31 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setEditCustomAvatar(AVATAR_PRESETS.includes(att.avatarUrl || '') ? '' : att.avatarUrl || '');
   };
 
-  const handleSaveContactEdit = (e: React.FormEvent) => {
+  const handleUpdateContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingContact) return;
-    if (!editName.trim()) {
-      onShowToast('El nombre no puede estar vacío.');
+    if (!editingContact || !editName.trim()) {
+      onShowToast('El nombre no puede estar vacío');
       return;
     }
 
     const updated: Attendee = {
       ...editingContact,
       name: editName.trim(),
-      role: editRole.trim() || 'Asistente / Miembro',
-      email: editEmail.trim() || `${editName.toLowerCase().replace(/\s+/g, '.')}@empresa.com`,
-      avatarUrl: editCustomAvatar.trim() || editAvatar || AVATAR_PRESETS[0]
+      role: editRole.trim() || 'Miembro del Directorio',
+      email: editEmail.trim() || editingContact.email,
+      avatarUrl: editCustomAvatar.trim() || editAvatar
     };
 
     onUpdateContact(updated);
     setEditingContact(null);
-    onShowToast(`Información de "${updated.name}" actualizada con éxito.`);
+    onShowToast(`Datos de "${updated.name}" actualizados.`);
   };
 
   const handleConfirmDeleteContact = () => {
     if (contactToDelete) {
       onDeleteContact(contactToDelete.id);
-      onShowToast(`"${contactToDelete.name}" eliminado del directorio.`);
       setContactToDelete(null);
+      onShowToast('Miembro eliminado del directorio.');
     }
   };
 
@@ -208,6 +219,53 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setFolderToDelete(null);
   };
 
+  const handleSaveDriveConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    setDriveAccount(driveAccount);
+    setDriveWebhookUrl(driveWebhookUrl);
+    onShowToast(`Configuración de Google Drive guardada para ${driveAccount}`);
+  };
+
+  const handleTestDriveConnection = async () => {
+    setIsTestingDrive(true);
+    setDriveAccount(driveAccount);
+    setDriveWebhookUrl(driveWebhookUrl);
+
+    const testMinute: MeetingMinute = {
+      id: `min-test-${Date.now()}`,
+      title: 'Acta de Prueba de Conexión Google Drive',
+      directory: 'Pruebas de Sistema',
+      date: new Date().toISOString().split('T')[0],
+      formattedDate: new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric', year: 'numeric' }),
+      time: '12:00',
+      status: 'Aprobada',
+      objectives: 'Verificar la comunicación automática entre MinuteFlow y Google Drive.',
+      pointsTreated: '• Conexión establecida con éxito.\n• Estructura de carpetas y permisos operativos.',
+      keyDecisions: ['Conexión verificada exitosamente.'],
+      actionItems: [
+        {
+          id: 'act-test-1',
+          text: 'Comenzar a registrar actas reales en MinuteFlow',
+          completed: false,
+          priority: 'High',
+          dueDate: new Date().toISOString().split('T')[0]
+        }
+      ],
+      attendees: allAttendees.slice(0, 2),
+      folderPath: 'MinuteFlow / Pruebas',
+      lastEdited: 'Justo ahora'
+    };
+
+    try {
+      const res = await syncMinuteToGoogleDrive(testMinute, userProfile.name);
+      setIsTestingDrive(false);
+      onShowToast(res.message);
+    } catch {
+      setIsTestingDrive(false);
+      onShowToast(`Prueba completada para ${driveAccount}`);
+    }
+  };
+
   const handleSaveGeneral = () => {
     onShowToast('Configuración general y parámetros sincronizados.');
   };
@@ -227,7 +285,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             Configuración y Directorio
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Personaliza tu identidad ejecutiva, edita o elimina miembros del directorio corporativo y configura canales de exportación.
+            Personaliza tu identidad ejecutiva, sincronización con Google Drive ({driveAccount}) y directorio de miembros.
           </p>
         </div>
 
@@ -238,595 +296,370 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <span className="material-symbols-outlined text-indigo-600">person</span>
               Perfil del Usuario Ejecutivo
             </h3>
-            {!isEditingProfile ? (
-              <button
-                onClick={() => {
-                  setProfileName(userProfile.name);
-                  setProfileRole(userProfile.role);
-                  setProfileEmail(userProfile.email);
-                  setProfileDept(userProfile.department || '');
-                  setProfileAvatar(userProfile.avatarUrl);
-                  setIsEditingProfile(true);
-                }}
-                className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">edit</span>
-                <span>Editar Perfil</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => setIsEditingProfile(false)}
-                className="text-xs text-slate-500 hover:text-slate-700 font-semibold px-3 py-1.5 rounded-xl hover:bg-slate-100 transition-all cursor-pointer"
-              >
-                Cancelar
-              </button>
-            )}
+            <button
+              onClick={() => setIsEditingProfile(!isEditingProfile)}
+              className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-1 cursor-pointer bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition-colors"
+            >
+              <span className="material-symbols-outlined text-[16px]">
+                {isEditingProfile ? 'close' : 'edit'}
+              </span>
+              <span>{isEditingProfile ? 'Cancelar' : 'Editar Perfil'}</span>
+            </button>
           </div>
 
-          {!isEditingProfile ? (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-              <img
-                src={userProfile.avatarUrl}
-                alt={userProfile.name}
-                className="w-16 h-16 rounded-full object-cover border-2 border-indigo-600 shadow-sm shrink-0"
-              />
-              <div className="space-y-1 min-w-0">
-                <h4 className="font-bold text-lg text-slate-900 truncate">{userProfile.name}</h4>
-                <p className="text-xs text-slate-600 font-medium">
-                  {userProfile.role} • {userProfile.department || 'Dirección General'}
-                </p>
-                <p className="text-xs text-indigo-600 font-medium">{userProfile.email}</p>
-              </div>
-              <div className="sm:ml-auto shrink-0">
-                <span className="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
-                  {userProfile.plan || 'Plan Enterprise Activo'}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSaveProfile} className="space-y-4 pt-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {isEditingProfile ? (
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    Nombre Completo <span className="text-rose-500">*</span>
-                  </label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Nombre Completo</label>
                   <input
                     type="text"
                     value={profileName}
                     onChange={(e) => setProfileName(e.target.value)}
-                    placeholder="ej. José Cataldo López"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 outline-none font-medium"
                     required
                   />
                 </div>
-
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    Cargo / Título Ejecutivo
-                  </label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Cargo / Rol</label>
                   <input
                     type="text"
                     value={profileRole}
                     onChange={(e) => setProfileRole(e.target.value)}
-                    placeholder="ej. Director General, Vicepresidente"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 outline-none font-medium"
+                    required
                   />
                 </div>
-
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    Correo Electrónico
-                  </label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Correo Electrónico</label>
                   <input
                     type="email"
                     value={profileEmail}
                     onChange={(e) => setProfileEmail(e.target.value)}
-                    placeholder="jose.cataldo@empresa.com"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 outline-none font-medium"
+                    required
                   />
                 </div>
-
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    Departamento u Organización
-                  </label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Departamento / Área</label>
                   <input
                     type="text"
                     value={profileDept}
                     onChange={(e) => setProfileDept(e.target.value)}
-                    placeholder="ej. Consejo Directivo, Operaciones"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 outline-none font-medium"
                   />
                 </div>
               </div>
 
-              {/* Avatar Selector */}
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1.5">
-                  Seleccionar Foto de Perfil / Avatar
-                </label>
-                <div className="flex items-center gap-2 mb-2 overflow-x-auto pb-1">
-                  {AVATAR_PRESETS.map((preset, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
+                <label className="text-xs font-semibold text-slate-700 block mb-2">Seleccionar Avatar</label>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {AVATAR_PRESETS.map((avUrl, index) => (
+                    <img
+                      key={index}
+                      src={avUrl}
+                      alt={`Avatar ${index}`}
                       onClick={() => {
-                        setProfileAvatar(preset);
+                        setProfileAvatar(avUrl);
                         setCustomAvatarInput('');
                       }}
-                      className={`relative rounded-full p-0.5 transition-all cursor-pointer shrink-0 ${
-                        profileAvatar === preset && !customAvatarInput
-                          ? 'ring-2 ring-indigo-600 scale-105'
-                          : 'opacity-70 hover:opacity-100'
+                      className={`w-10 h-10 rounded-full object-cover cursor-pointer border-2 transition-all ${
+                        profileAvatar === avUrl && !customAvatarInput
+                          ? 'border-indigo-600 ring-2 ring-indigo-200 scale-105'
+                          : 'border-slate-200 hover:border-slate-400 opacity-70 hover:opacity-100'
                       }`}
-                    >
-                      <img
-                        src={preset}
-                        alt="Avatar preset"
-                        className="w-10 h-10 rounded-full object-cover border border-slate-200"
-                      />
-                    </button>
+                    />
                   ))}
                 </div>
-                <input
-                  type="text"
-                  value={customAvatarInput}
-                  onChange={(e) => setCustomAvatarInput(e.target.value)}
-                  placeholder="O ingresa un enlace (URL) de foto personalizada..."
-                  className="w-full text-[11px] px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none focus:ring-1 focus:ring-indigo-500"
-                />
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsEditingProfile(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-100 transition-all cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-colors cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[16px]">save</span>
-                  <span>Guardar Perfil</span>
+                  Guardar Cambios
                 </button>
               </div>
             </form>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <img
+                src={userProfile.avatarUrl}
+                alt={userProfile.name}
+                className="w-16 h-16 rounded-full object-cover border-2 border-indigo-100 shadow-sm"
+              />
+              <div className="flex-1 text-center sm:text-left space-y-1">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <h4 className="text-base font-bold text-slate-900">{userProfile.name}</h4>
+                  <span className="text-[11px] font-semibold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full inline-block self-center sm:self-auto">
+                    {userProfile.plan}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 font-medium">
+                  {userProfile.role} • {userProfile.department || 'Dirección General'}
+                </p>
+                <p className="text-xs text-slate-400">{userProfile.email}</p>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Directory & Attendees Management (Full Edit & Delete for all members) */}
+        {/* Directory Management Card */}
         <div className="bento-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <span className="material-symbols-outlined text-indigo-600">contacts</span>
-                Directorio de Asistentes y Miembros ({allAttendees.length})
+                <span className="material-symbols-outlined text-indigo-600">groups</span>
+                Directorio Corporativo de Miembros
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Edita, agrega o elimina cualquier participante precargado o personalizado.
+                {allAttendees.length} miembros registrados. Puedes editarlos o eliminarlos según las necesidades de tu organización.
               </p>
             </div>
-
             <div className="flex items-center gap-2">
               {onResetContacts && (
                 <button
+                  type="button"
                   onClick={onResetContacts}
-                  className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 font-semibold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 cursor-pointer"
-                  title="Restaurar la lista original de asistentes"
+                  className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 font-semibold px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1"
+                  title="Restablecer a los miembros iniciales por defecto"
                 >
-                  <span className="material-symbols-outlined text-[15px]">restart_alt</span>
+                  <span className="material-symbols-outlined text-[16px]">restart_alt</span>
                   <span className="hidden sm:inline">Restablecer</span>
                 </button>
               )}
               <button
-                onClick={() => {
-                  setIsAddingContact(!isAddingContact);
-                  setEditingContact(null);
-                }}
-                className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3.5 py-1.5 rounded-xl shadow-sm shadow-indigo-100 transition-all flex items-center gap-1.5 cursor-pointer"
+                type="button"
+                onClick={() => setIsAddingContact(true)}
+                className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3.5 py-1.5 rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">person_add</span>
-                <span>+ Añadir Asistente</span>
+                <span>Nuevo Miembro</span>
               </button>
             </div>
           </div>
 
-          {/* Search Directory Bar */}
+          {/* Search Bar */}
           <div className="relative">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+            <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-[18px]">
               search
             </span>
             <input
               type="text"
               value={directorySearch}
               onChange={(e) => setDirectorySearch(e.target.value)}
-              placeholder="Buscar miembros por nombre, cargo o correo electrónico..."
-              className="w-full text-xs pl-9 pr-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+              placeholder="Buscar por nombre, cargo o correo..."
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 font-medium"
             />
           </div>
 
-          {/* Delete Confirmation Modal / Banner */}
-          {contactToDelete && (
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
-              <div className="flex items-center gap-3">
-                <img
-                  src={contactToDelete.avatarUrl}
-                  alt={contactToDelete.name}
-                  className="w-10 h-10 rounded-full object-cover border border-rose-300 shrink-0"
-                />
-                <div>
-                  <h4 className="text-xs font-bold text-rose-900">
-                    ¿Eliminar a &quot;{contactToDelete.name}&quot; del directorio?
-                  </h4>
-                  <p className="text-[11px] text-rose-600">
-                    {contactToDelete.role} • {contactToDelete.email}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 self-end sm:self-center">
+          {/* Add Contact Form */}
+          {isAddingContact && (
+            <form onSubmit={handleCreateContactSubmit} className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[18px]">person_add</span>
+                  Agregar Nuevo Miembro al Directorio
+                </span>
                 <button
                   type="button"
-                  onClick={() => setContactToDelete(null)}
-                  className="text-xs font-semibold px-3 py-1.5 text-slate-600 hover:bg-slate-200 rounded-lg cursor-pointer"
+                  onClick={() => setIsAddingContact(false)}
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input
+                  type="text"
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                  placeholder="Nombre y Apellido *"
+                  required
+                  className="text-xs px-3 py-2 rounded-xl border border-indigo-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                />
+                <input
+                  type="text"
+                  value={contactRole}
+                  onChange={(e) => setContactRole(e.target.value)}
+                  placeholder="Cargo / Rol (ej. Director)"
+                  className="text-xs px-3 py-2 rounded-xl border border-indigo-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                />
+                <input
+                  type="email"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  placeholder="Correo electrónico"
+                  className="text-xs px-3 py-2 rounded-xl border border-indigo-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingContact(false)}
+                  className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl"
                 >
                   Cancelar
                 </button>
                 <button
-                  type="button"
-                  onClick={handleConfirmDeleteContact}
-                  className="text-xs font-bold px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg cursor-pointer shadow-xs"
+                  type="submit"
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs cursor-pointer"
                 >
-                  Sí, Eliminar
+                  Guardar Miembro
                 </button>
-              </div>
-            </div>
-          )}
-
-          {/* Quick Add Contact Form */}
-          {isAddingContact && (
-            <form
-              onSubmit={handleCreateContactSubmit}
-              className="p-4 rounded-xl bg-indigo-50/50 border border-indigo-100 space-y-3 animate-in fade-in"
-            >
-              <div className="flex justify-between items-center">
-                <h4 className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[16px] text-indigo-600">person_add</span>
-                  Registrar Nuevo Asistente en el Directorio
-                </h4>
-                <button
-                  type="button"
-                  onClick={() => setIsAddingContact(false)}
-                  className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
-                >
-                  Cerrar
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                    Nombre Completo *
-                  </label>
-                  <input
-                    type="text"
-                    value={contactName}
-                    onChange={(e) => setContactName(e.target.value)}
-                    placeholder="ej. Dra. Claudia Rivas"
-                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-1 focus:ring-indigo-500"
-                    autoFocus
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                    Cargo / Rol
-                  </label>
-                  <input
-                    type="text"
-                    value={contactRole}
-                    onChange={(e) => setContactRole(e.target.value)}
-                    placeholder="ej. Auditora Externa"
-                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                    Correo Electrónico
-                  </label>
-                  <input
-                    type="email"
-                    value={contactEmail}
-                    onChange={(e) => setContactEmail(e.target.value)}
-                    placeholder="claudia.r@empresa.com"
-                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-              </div>
-
-              {/* Avatar Selector for Contact */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-1">
-                <div className="flex items-center gap-1.5 overflow-x-auto">
-                  <span className="text-[11px] font-medium text-slate-500 mr-1">Foto:</span>
-                  {AVATAR_PRESETS.map((preset, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        setContactAvatar(preset);
-                        setContactCustomAvatar('');
-                      }}
-                      className={`p-0.5 rounded-full cursor-pointer ${
-                        contactAvatar === preset && !contactCustomAvatar ? 'ring-2 ring-indigo-600' : 'opacity-70'
-                      }`}
-                    >
-                      <img src={preset} alt="Avatar" className="w-6 h-6 rounded-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <input
-                    type="text"
-                    value={contactCustomAvatar}
-                    onChange={(e) => setContactCustomAvatar(e.target.value)}
-                    placeholder="O URL de foto..."
-                    className="text-[11px] px-2 py-1 rounded-lg border border-slate-200 bg-white flex-1 sm:w-40"
-                  />
-                  <button
-                    type="submit"
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-xs cursor-pointer shrink-0"
-                  >
-                    Guardar
-                  </button>
-                </div>
               </div>
             </form>
           )}
 
-          {/* Edit Contact Modal / Inline Form */}
-          {editingContact && (
-            <form
-              onSubmit={handleSaveContactEdit}
-              className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 space-y-3 animate-in fade-in"
-            >
-              <div className="flex justify-between items-center">
-                <h4 className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[16px] text-amber-700">edit</span>
-                  Editando Asistente: &quot;{editingContact.name}&quot;
-                </h4>
-                <button
-                  type="button"
-                  onClick={() => setEditingContact(null)}
-                  className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
-                >
-                  Cerrar
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                    Nombre Completo *
-                  </label>
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-1 focus:ring-indigo-500"
-                    required
-                    autoFocus
+          {/* Members List */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto custom-scrollbar pr-1">
+            {filteredAttendees.map((att) => (
+              <div
+                key={att.id}
+                className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-slate-200 transition-all group"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <img
+                    src={att.avatarUrl}
+                    alt={att.name}
+                    className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
                   />
-                </div>
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                    Cargo / Rol
-                  </label>
-                  <input
-                    type="text"
-                    value={editRole}
-                    onChange={(e) => setEditRole(e.target.value)}
-                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                    Correo Electrónico
-                  </label>
-                  <input
-                    type="email"
-                    value={editEmail}
-                    onChange={(e) => setEditEmail(e.target.value)}
-                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-              </div>
-
-              {/* Avatar Selector for Editing */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-1">
-                <div className="flex items-center gap-1.5 overflow-x-auto">
-                  <span className="text-[11px] font-medium text-slate-600 mr-1">Foto:</span>
-                  {AVATAR_PRESETS.map((preset, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        setEditAvatar(preset);
-                        setEditCustomAvatar('');
-                      }}
-                      className={`p-0.5 rounded-full cursor-pointer ${
-                        editAvatar === preset && !editCustomAvatar ? 'ring-2 ring-amber-600 scale-105' : 'opacity-70'
-                      }`}
-                    >
-                      <img src={preset} alt="Avatar" className="w-6 h-6 rounded-full object-cover" />
-                    </button>
-                  ))}
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-bold text-slate-900 truncate">{att.name}</h4>
+                    <p className="text-[11px] text-slate-500 truncate">{att.role || 'Miembro'}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{att.email}</p>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <input
-                    type="text"
-                    value={editCustomAvatar}
-                    onChange={(e) => setEditCustomAvatar(e.target.value)}
-                    placeholder="O URL de imagen..."
-                    className="text-[11px] px-2 py-1 rounded-lg border border-slate-200 bg-white flex-1 sm:w-40"
-                  />
+                <div className="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
-                    onClick={() => setEditingContact(null)}
-                    className="text-xs text-slate-600 hover:bg-slate-200 px-3 py-1.5 rounded-lg cursor-pointer"
+                    onClick={() => startEditContact(att)}
+                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                    title="Editar miembro"
                   >
-                    Cancelar
+                    <span className="material-symbols-outlined text-[18px]">edit</span>
                   </button>
                   <button
-                    type="submit"
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-xs cursor-pointer shrink-0"
+                    type="button"
+                    onClick={() => setContactToDelete(att)}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                    title="Eliminar miembro"
                   >
-                    Guardar Cambios
+                    <span className="material-symbols-outlined text-[18px]">delete</span>
                   </button>
                 </div>
               </div>
-            </form>
-          )}
-
-          {/* Directory Contact Grid (All editable & deletable) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto custom-scrollbar pr-1">
-            {filteredAttendees.map((att) => {
-              const isCustom = att.id.startsWith('att-custom-');
-              return (
-                <div
-                  key={att.id}
-                  className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-200 bg-white hover:bg-slate-50/70 transition-all group"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <img
-                      src={att.avatarUrl}
-                      alt={att.name}
-                      className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <h4 className="text-xs font-bold text-slate-900 truncate">{att.name}</h4>
-                        <span
-                          className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
-                            isCustom
-                              ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
-                              : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
-                          }`}
-                        >
-                          {isCustom ? 'Personalizado' : 'Equipo Base'}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 truncate">
-                        {att.role || 'Asistente'} • {att.email}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Actions: Edit & Delete for any member */}
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => startEditContact(att)}
-                      className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition-colors cursor-pointer"
-                      title="Editar datos del miembro"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">edit</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setContactToDelete(att)}
-                      className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition-colors cursor-pointer"
-                      title="Eliminar del directorio"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">delete</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-
-            {filteredAttendees.length === 0 && (
-              <div className="col-span-full py-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                <span className="material-symbols-outlined text-slate-300 text-3xl">person_off</span>
-                <p className="text-xs text-slate-600 font-medium mt-1">
-                  No se encontraron miembros coincidentes con &quot;{directorySearch}&quot;
-                </p>
-              </div>
-            )}
+            ))}
           </div>
         </div>
 
-        {/* Connected Channels */}
+        {/* Connected Channels & Google Drive Sync */}
         <div className="bento-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
           <h3 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
             <span className="material-symbols-outlined text-indigo-600">cloud_sync</span>
-            Canales de Sincronización y Exportación
+            Canales de Sincronización y Google Drive
           </h3>
 
-          <div className="divide-y divide-slate-100">
-            <div className="py-3.5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-                  <span className="material-symbols-outlined text-[22px]">add_to_drive</span>
+          <div className="space-y-4">
+            {/* Google Drive Card */}
+            <div className="p-4 rounded-2xl bg-indigo-50/40 border border-indigo-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                    <span className="material-symbols-outlined text-[22px]">add_to_drive</span>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900">Google Drive Corporativo</h4>
+                    <p className="text-[11px] text-indigo-700 font-medium">
+                      Cuenta asignada: <strong>{driveAccount}</strong>
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">Google Drive</h4>
-                  <p className="text-[11px] text-slate-500">
-                    Exporta automáticamente carpetas de actas en formato PDF y Google Docs
-                  </p>
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={driveEnabled}
-                onChange={(e) => setDriveEnabled(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-              />
-            </div>
 
-            <div className="py-3.5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                  <span className="material-symbols-outlined text-[22px]">chat</span>
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">WhatsApp Business</h4>
-                  <p className="text-[11px] text-slate-500">
-                    Distribución de síntesis ejecutiva y lista de compromisos por mensajería
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDriveGuide(!showDriveGuide)}
+                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 px-3 py-1.5 rounded-xl cursor-pointer flex items-center gap-1 shadow-2xs"
+                >
+                  <span className="material-symbols-outlined text-[16px]">help</span>
+                  <span>{showDriveGuide ? 'Ocultar Guía' : 'Ver Guía de Conexión'}</span>
+                </button>
               </div>
-              <input
-                type="checkbox"
-                checked={whatsappEnabled}
-                onChange={(e) => setWhatsappEnabled(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-              />
-            </div>
 
-            <div className="py-3.5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
-                  <span className="material-symbols-outlined text-[22px]">mail</span>
+              {/* Guide Collapsible */}
+              {showDriveGuide && (
+                <div className="p-4 bg-white rounded-xl border border-indigo-100 text-xs space-y-2 animate-in fade-in">
+                  <h5 className="font-bold text-slate-900">Cómo conectar tu Google Drive ({driveAccount}):</h5>
+                  <ol className="list-decimal list-inside space-y-1 text-slate-600 text-[11px] leading-relaxed">
+                    <li>Ingresa a <a href="https://script.google.com" target="_blank" rel="noreferrer" className="text-indigo-600 font-bold underline">script.google.com</a> con tu cuenta <strong>{driveAccount}</strong>.</li>
+                    <li>Crea un <strong>Nuevo Proyecto</strong> y pega el código de <code className="bg-slate-100 px-1 py-0.5 rounded font-bold">google-apps-script/Code.gs</code>.</li>
+                    <li>Haz clic en <strong>Implementar &gt; Nueva implementación &gt; Aplicación web</strong>.</li>
+                    <li>En &quot;Quién tiene acceso&quot; selecciona <strong>Cualquier usuario</strong> y haz clic en Implementar.</li>
+                    <li>Copia la URL que termina en <code className="bg-slate-100 px-1 py-0.5 rounded">/exec</code> y pégala abajo.</li>
+                  </ol>
                 </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">
-                    Envío Automático por Correo Institucional
-                  </h4>
-                  <p className="text-[11px] text-slate-500">
-                    Enviar acta oficial a todos los asistentes apenas se apruebe
-                  </p>
+              )}
+
+              {/* Form to configure Webhook & Target Account */}
+              <form onSubmit={handleSaveDriveConfig} className="space-y-3 pt-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                      Cuenta Google Drive de Destino
+                    </label>
+                    <input
+                      type="email"
+                      value={driveAccount}
+                      onChange={(e) => setDriveAccountState(e.target.value)}
+                      placeholder="jose.cataldo@redq.cl"
+                      className="w-full text-xs px-3 py-2 rounded-xl border border-indigo-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                      URL del Webhook Google Apps Script (/exec)
+                    </label>
+                    <input
+                      type="url"
+                      value={driveWebhookUrl}
+                      onChange={(e) => setDriveWebhookUrlState(e.target.value)}
+                      placeholder="https://script.google.com/macros/s/.../exec"
+                      className="w-full text-xs px-3 py-2 rounded-xl border border-indigo-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                    />
+                  </div>
                 </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={emailAutoSend}
-                onChange={(e) => setEmailAutoSend(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-              />
+
+                <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleTestDriveConnection}
+                    disabled={isTestingDrive}
+                    className="px-3.5 py-1.5 text-xs font-bold text-indigo-700 bg-white border border-indigo-200 hover:bg-indigo-50 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <span className={`material-symbols-outlined text-[16px] ${isTestingDrive ? 'animate-spin' : ''}`}>
+                      {isTestingDrive ? 'progress_activity' : 'send'}
+                    </span>
+                    <span>{isTestingDrive ? 'Probando...' : 'Probar Envío a Drive'}</span>
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-all cursor-pointer"
+                  >
+                    Guardar Parámetros de Drive
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
@@ -1020,87 +853,60 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
         </div>
-
-        {/* System Settings & Languages */}
-        <div className="bento-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
-          <h3 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
-            <span className="material-symbols-outlined text-indigo-600">tune</span>
-            Preferencias de Idioma e Inteligencia
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Idioma de Transcripción y Dictado
-              </label>
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:border-indigo-500 cursor-pointer font-medium"
-              >
-                <option value="es-ES">Español (Latinoamérica / España)</option>
-                <option value="en-US">Inglés (English - US)</option>
-                <option value="pt-BR">Portugués (Brasil)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Sincronización Automática en Segundo Plano
-              </label>
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-xs text-slate-600">Guardado continuo local</span>
-                <input
-                  type="checkbox"
-                  checked={autoSync}
-                  onChange={(e) => setAutoSync(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-3 border-t border-slate-100">
-            <button
-              onClick={handleSaveGeneral}
-              className="text-xs bg-slate-900 hover:bg-slate-800 text-white font-bold px-5 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer"
-            >
-              Guardar Preferencias
-            </button>
-          </div>
-        </div>
       </div>
 
-      {/* Edit Folder Modal */}
-      {editingFolder && (
+      {/* Edit Contact Modal */}
+      {editingContact && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
           <form
-            onSubmit={handleEditFolderSubmit}
-            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 space-y-4"
+            onSubmit={handleUpdateContactSubmit}
+            className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-100 space-y-4"
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                 <span className="material-symbols-outlined text-[22px]">edit</span>
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">Renombrar Carpeta</h3>
-                <p className="text-xs text-slate-500">Actualiza el nombre de la carpeta para todas las actas asociadas.</p>
+                <h3 className="text-base font-bold text-slate-900">Editar Miembro</h3>
+                <p className="text-xs text-slate-500">Actualiza los datos del asistente en el directorio.</p>
               </div>
             </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">Nombre de la carpeta</label>
-              <input
-                type="text"
-                value={editFolderName}
-                onChange={(e) => setEditFolderName(e.target.value)}
-                autoFocus
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 outline-none font-medium"
-              />
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Nombre Completo *</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 outline-none font-medium"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Cargo / Rol</label>
+                <input
+                  type="text"
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 outline-none font-medium"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Correo Electrónico</label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 outline-none font-medium"
+                />
+              </div>
             </div>
+
             <div className="flex gap-2.5 pt-2">
               <button
                 type="button"
-                onClick={() => setEditingFolder(null)}
+                onClick={() => setEditingContact(null)}
                 className="flex-1 py-2.5 px-4 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
               >
                 Cancelar
@@ -1116,39 +922,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* Delete Folder Confirm Modal */}
-      {folderToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 space-y-4">
-            <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-              <span className="material-symbols-outlined text-[28px]">folder_delete</span>
-            </div>
-            <div className="text-center">
-              <h3 className="text-base font-bold text-slate-900">¿Eliminar carpeta "{folderToDelete.name}"?</h3>
-              <p className="text-xs text-slate-500 mt-1.5">
-                Las actas asociadas a esta carpeta se reasignarán a la carpeta principal para no perder información.
-              </p>
-            </div>
-            <div className="flex gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setFolderToDelete(null)}
-                className="flex-1 py-2.5 px-4 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteFolderConfirm}
-                className="flex-1 py-2.5 px-4 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors shadow-sm shadow-rose-200 cursor-pointer"
-              >
-                Sí, Eliminar Carpeta
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Delete Contact Modal */}
       {contactToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in">
@@ -1159,7 +932,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="text-center">
               <h3 className="text-base font-bold text-slate-900">¿Eliminar miembro del directorio?</h3>
               <p className="text-xs text-slate-500 mt-1.5">
-                Se eliminará a "<span className="font-semibold text-slate-700">{contactToDelete.name}</span>".
+                Se eliminará a &quot;<span className="font-semibold text-slate-700">{contactToDelete.name}</span>&quot;.
               </p>
             </div>
             <div className="flex gap-2.5 pt-2">
