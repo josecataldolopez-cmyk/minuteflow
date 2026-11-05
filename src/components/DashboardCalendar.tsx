@@ -20,6 +20,14 @@ interface DashboardCalendarProps {
 type CalendarViewMode = 'month' | 'week' | 'list';
 type CalendarFilter = 'all' | 'pending' | 'completed' | 'meetings' | 'high_priority';
 
+// Helper to format date as YYYY-MM-DD
+const formatDateKey = (d: Date): string => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
   actionItems,
   schedule,
@@ -30,9 +38,9 @@ export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
   onSelectMinute,
   onNewMinute
 }) => {
-  // Calendar Navigation State - Default to August 2026 (matching dataset current time)
-  const [currentDate, setCurrentDate] = useState<Date>(new Date(2026, 7, 31)); // Aug 31, 2026
-  const [selectedDateStr, setSelectedDateStr] = useState<string>('2026-08-31');
+  // Calendar Navigation State - Default to real current date
+  const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
+  const [selectedDateStr, setSelectedDateStr] = useState<string>(() => formatDateKey(new Date()));
   const [viewMode, setViewMode] = useState<CalendarViewMode>('month');
   const [filter, setFilter] = useState<CalendarFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -74,21 +82,14 @@ export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
   };
 
   const handleGoToToday = () => {
-    const today = new Date(2026, 7, 31);
+    const today = new Date();
     setCurrentDate(today);
-    setSelectedDateStr('2026-08-31');
-  };
-
-  // Helper to format date as YYYY-MM-DD
-  const formatDateKey = (d: Date): string => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    setSelectedDateStr(formatDateKey(today));
   };
 
   // Build calendar matrix for the month
   const calendarDays = useMemo(() => {
+    const todayStr = formatDateKey(new Date());
     const firstDayOfMonth = new Date(year, month, 1);
     const lastDayOfMonth = new Date(year, month + 1, 0);
 
@@ -106,7 +107,7 @@ export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
         date: d,
         dateStr: formatDateKey(d),
         isCurrentMonth: false,
-        isToday: formatDateKey(d) === '2026-08-31'
+        isToday: formatDateKey(d) === todayStr
       });
     }
 
@@ -117,7 +118,7 @@ export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
         date: d,
         dateStr: formatDateKey(d),
         isCurrentMonth: true,
-        isToday: formatDateKey(d) === '2026-08-31'
+        isToday: formatDateKey(d) === todayStr
       });
     }
 
@@ -129,7 +130,7 @@ export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
         date: d,
         dateStr: formatDateKey(d),
         isCurrentMonth: false,
-        isToday: formatDateKey(d) === '2026-08-31'
+        isToday: formatDateKey(d) === todayStr
       });
     }
 
@@ -138,6 +139,7 @@ export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
 
   // Aggregate items by date
   const itemsByDate = useMemo(() => {
+    const todayStr = formatDateKey(new Date());
     const map: Record<
       string,
       {
@@ -149,8 +151,7 @@ export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
 
     // Map Action Items
     actionItems.forEach((action) => {
-      // If action has a dueDate, map it, else map to fallback
-      const dateKey = action.dueDate || '2026-08-31';
+      const dateKey = action.dueDate || todayStr;
       if (!map[dateKey]) {
         map[dateKey] = { actions: [], schedules: [], nextSessions: [] };
       }
@@ -159,7 +160,7 @@ export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
 
     // Map Schedule Items
     schedule.forEach((sch) => {
-      const dateKey = sch.date || '2026-08-31';
+      const dateKey = sch.date || todayStr;
       if (!map[dateKey]) {
         map[dateKey] = { actions: [], schedules: [], nextSessions: [] };
       }
@@ -181,8 +182,9 @@ export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
 
   // Filtered action items for the current selected month / filter
   const monthlyStats = useMemo(() => {
+    const todayStr = formatDateKey(new Date());
     const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-    const thisMonthActions = actionItems.filter((a) => (a.dueDate || '2026-08-31').startsWith(monthPrefix));
+    const thisMonthActions = actionItems.filter((a) => (a.dueDate || todayStr).startsWith(monthPrefix));
     const completed = thisMonthActions.filter((a) => a.completed).length;
     const pending = thisMonthActions.filter((a) => !a.completed).length;
     const highPriority = thisMonthActions.filter((a) => a.priority === 'High' && !a.completed).length;

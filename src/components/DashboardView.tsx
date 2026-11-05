@@ -43,7 +43,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'calendar'>('overview');
   const [newActionText, setNewActionText] = useState('');
-  const [newActionDueDate, setNewActionDueDate] = useState('2026-08-31');
+  const [newActionDueDate, setNewActionDueDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [newActionPriority, setNewActionPriority] = useState<'Low' | 'Medium' | 'High'>('High');
   const [newActionAssigneeId, setNewActionAssigneeId] = useState<string>(allAttendees[0]?.id || '');
   const [isAddingAction, setIsAddingAction] = useState(false);
