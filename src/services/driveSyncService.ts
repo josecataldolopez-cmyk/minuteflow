@@ -1,4 +1,9 @@
 import { MeetingMinute, Organization } from '../types';
+import {
+  isDriveOAuthConnected,
+  getDriveOAuthAccount,
+  uploadMinuteViaOAuth
+} from './googleDriveOAuthService';
 
 const GLOBAL_STORAGE_KEY = 'minuteflow_drive_webhook_url';
 const DEFAULT_ACCOUNT = 'jose.cataldo@redq.cl';
@@ -133,10 +138,24 @@ export async function syncMinuteToGoogleDrive(
   const webhookUrl = organization?.driveWebhookUrl || getOrgDriveWebhookUrl(orgId);
   const targetAccount = organization?.driveAccount || getOrgDriveAccount(orgId);
 
+  // 1. Método Preferido: Conexión con 1 Clic (Google OAuth 2.0 Oficial)
+  if (isDriveOAuthConnected(orgId)) {
+    const oauthRes = await uploadMinuteViaOAuth(minute, organization);
+    return {
+      success: oauthRes.success,
+      message: oauthRes.message,
+      fileUrl: oauthRes.fileUrl,
+      folderName: oauthRes.folderName,
+      organizationName: orgName
+    };
+  }
+
+  // 2. Si no hay OAuth ni Webhook configurado
   if (!webhookUrl) {
+    const oauthAccount = getDriveOAuthAccount(orgId) || targetAccount;
     return {
       success: true,
-      message: `Acta preparada para el Drive de ${targetAccount}. El Administrador debe registrar la URL del Webhook en Configuración para guardado automático en vivo.`,
+      message: `Acta preparada para el Drive de ${oauthAccount}. Haz clic en "Conectar Google Drive" para activar la sincronización oficial con 1 clic.`,
       fileUrl: `https://drive.google.com/drive/u/0/my-drive`,
       organizationName: orgName
     };
