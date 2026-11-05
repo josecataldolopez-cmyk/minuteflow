@@ -476,6 +476,42 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
 
       {/* Main Editor Body */}
       <div className="flex-1 overflow-y-auto p-4 md:p-8 pb-32 custom-scrollbar">
+        {/* Institutional Letterhead Banner */}
+        {(currentOrganization?.headerText || currentOrganization?.slogan || currentOrganization?.logoUrl) && (
+          <div className="max-w-6xl mx-auto mb-4 p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              {currentOrganization.logoUrl ? (
+                <img
+                  src={currentOrganization.logoUrl}
+                  alt={currentOrganization.name}
+                  className="w-10 h-10 rounded-xl object-contain shrink-0 border border-slate-100"
+                />
+              ) : (
+                <div
+                  className="w-10 h-10 rounded-xl text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs"
+                  style={{ backgroundColor: currentOrganization.primaryColor || '#4f46e5' }}
+                >
+                  {currentOrganization.name.substring(0, 2).toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate font-mono">
+                  {currentOrganization.headerText || 'DOCUMENTO OFICIAL DE REUNIÓN'}
+                </span>
+                <h4 className="text-xs font-bold text-slate-900 truncate">
+                  {currentOrganization.name} {currentOrganization.slogan ? `— "${currentOrganization.slogan}"` : ''}
+                </h4>
+              </div>
+            </div>
+            <span
+              className="text-[10px] font-bold px-2.5 py-1 rounded-full text-white shrink-0 hidden sm:inline-block shadow-2xs"
+              style={{ backgroundColor: currentOrganization.primaryColor || '#4f46e5' }}
+            >
+              Espacio: {currentOrganization.code}
+            </span>
+          </div>
+        )}
+
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6">
           {/* Left Column: Metadata & Controls (4 cols) */}
           <div className="md:col-span-4 flex flex-col gap-5">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile, Attendee, DirectoryItem, MeetingMinute, Organization, UserRole } from '../types';
 import { AVATAR_PRESETS } from '../data/mockData';
 import {
@@ -9,6 +9,40 @@ import {
   validateDriveWebhookUrl,
   syncMinuteToGoogleDrive
 } from '../services/driveSyncService';
+
+export const COLOR_PRESETS = [
+  { name: 'Índigo Moderno', color: '#4f46e5', secondary: '#818cf8', label: 'Tech & Ejecutivo' },
+  { name: 'Azul Corporativo', color: '#1e40af', secondary: '#38bdf8', label: 'Finanzas & Legal' },
+  { name: 'Esmeralda Institucional', color: '#059669', secondary: '#34d399', label: 'Educación & Colegios' },
+  { name: 'Cian Innovación', color: '#0284c7', secondary: '#06b6d4', label: 'Salud & Clínicas' },
+  { name: 'Borgoña / Carmesí', color: '#b91c1c', secondary: '#f87171', label: 'Institucional Tradicional' },
+  { name: 'Ámbar Dorado', color: '#d97706', secondary: '#fbbf24', label: 'Gobernanza & Estado' },
+  { name: 'Púrpura Imperial', color: '#7e22ce', secondary: '#c084fc', label: 'Creativo & Diseño' },
+  { name: 'Pizarra Grafito', color: '#0f172a', secondary: '#64748b', label: 'Minimalista & Sobrio' }
+];
+
+export const LOGO_PRESETS = [
+  {
+    name: 'Tecnología & Empresa',
+    url: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=200&auto=format&fit=crop&q=80',
+    type: 'Empresarial'
+  },
+  {
+    name: 'Colegio / Educación',
+    url: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=200&auto=format&fit=crop&q=80',
+    type: 'Educacional'
+  },
+  {
+    name: 'Salud & Clínica',
+    url: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=200&auto=format&fit=crop&q=80',
+    type: 'Médico'
+  },
+  {
+    name: 'Gobernanza & Legal',
+    url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=200&auto=format&fit=crop&q=80',
+    type: 'Institucional'
+  }
+];
 
 interface SettingsViewProps {
   userProfile: UserProfile;
@@ -114,11 +148,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [showDriveGuide, setShowDriveGuide] = useState(false);
   const [isTestingDrive, setIsTestingDrive] = useState(false);
 
-  // Organization Metadata Edit State
+  // Organization Metadata & Visual Branding States
   const [isEditingOrg, setIsEditingOrg] = useState(false);
   const [orgDisplayName, setOrgDisplayName] = useState(orgName);
   const [orgTaxId, setOrgTaxId] = useState(currentOrganization?.taxId || '');
   const [orgDomain, setOrgDomain] = useState(currentOrganization?.domain || '');
+  const [orgPrimaryColor, setOrgPrimaryColor] = useState(currentOrganization?.primaryColor || '#4f46e5');
+  const [orgSecondaryColor, setOrgSecondaryColor] = useState(currentOrganization?.secondaryColor || '#06b6d4');
+  const [orgLogoUrl, setOrgLogoUrl] = useState(currentOrganization?.logoUrl || '');
+  const [orgSlogan, setOrgSlogan] = useState(currentOrganization?.slogan || '');
+  const [orgHeaderText, setOrgHeaderText] = useState(currentOrganization?.headerText || '');
+  const [orgAddress, setOrgAddress] = useState(currentOrganization?.address || '');
+  const [orgPhone, setOrgPhone] = useState(currentOrganization?.phone || '');
+  const [customLogoInput, setCustomLogoInput] = useState('');
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
+  const userAvatarInputRef = useRef<HTMLInputElement>(null);
 
   // Sincronizar estados locales cuando cambia la organización seleccionada
   useEffect(() => {
@@ -127,8 +171,52 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setOrgDisplayName(currentOrganization?.name || 'Establecimiento Principal');
     setOrgTaxId(currentOrganization?.taxId || '');
     setOrgDomain(currentOrganization?.domain || '');
+    setOrgPrimaryColor(currentOrganization?.primaryColor || '#4f46e5');
+    setOrgSecondaryColor(currentOrganization?.secondaryColor || '#06b6d4');
+    setOrgLogoUrl(currentOrganization?.logoUrl || '');
+    setOrgSlogan(currentOrganization?.slogan || '');
+    setOrgHeaderText(currentOrganization?.headerText || '');
+    setOrgAddress(currentOrganization?.address || '');
+    setOrgPhone(currentOrganization?.phone || '');
+    setCustomLogoInput('');
     setDriveUrlError(null);
   }, [orgId, currentOrganization]);
+
+  // Handle Logo Upload from Local Computer
+  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      onShowToast('La imagen es demasiado pesada. Máximo recomendado: 2MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      setOrgLogoUrl(base64);
+      setCustomLogoInput('');
+      onShowToast('Logo institucional cargado en memoria. Guarda los cambios para aplicar.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle User Avatar Upload from Local Computer
+  const handleUserAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      onShowToast('La imagen es demasiado pesada. Máximo recomendado: 2MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      setProfileAvatar(base64);
+      setCustomAvatarInput('');
+      onShowToast('Foto de perfil cargada. Haz clic en "Guardar Cambios" para confirmar.');
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,15 +246,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       return;
     }
     if (currentOrganization && onUpdateOrganization) {
+      const finalLogo = customLogoInput.trim() || orgLogoUrl;
       const updated: Organization = {
         ...currentOrganization,
         name: orgDisplayName.trim() || currentOrganization.name,
         taxId: orgTaxId.trim() || currentOrganization.taxId,
-        domain: orgDomain.trim() || currentOrganization.domain
+        domain: orgDomain.trim() || currentOrganization.domain,
+        primaryColor: orgPrimaryColor,
+        secondaryColor: orgSecondaryColor,
+        logoUrl: finalLogo,
+        slogan: orgSlogan.trim(),
+        headerText: orgHeaderText.trim(),
+        address: orgAddress.trim(),
+        phone: orgPhone.trim()
       };
       onUpdateOrganization(updated);
       setIsEditingOrg(false);
-      onShowToast(`Datos de ${updated.name} actualizados correctamente.`);
+      onShowToast(`Identidad y configuración de ${updated.name} actualizadas correctamente.`);
     }
   };
 
@@ -385,22 +481,33 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
 
-        {/* Organization / Establishment Information Card */}
-        <div className="bento-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
-                <span className="material-symbols-outlined text-[22px]">domain</span>
+        {/* Organization / Establishment Identity & Branding Card */}
+        <div className="bento-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-3">
+              <div
+                className="w-11 h-11 rounded-2xl text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0 overflow-hidden"
+                style={{ backgroundColor: currentOrganization?.primaryColor || '#4f46e5' }}
+              >
+                {currentOrganization?.logoUrl ? (
+                  <img
+                    src={currentOrganization.logoUrl}
+                    alt={currentOrganization.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="material-symbols-outlined text-[24px]">palette</span>
+                )}
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <span>Datos del Establecimiento / Empresa</span>
+                  <span>Identidad Visual y Datos del Establecimiento</span>
                   <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full font-bold">
                     ID: {currentOrganization?.code || orgId}
                   </span>
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Espacio privado aislado. Ningún otro establecimiento tiene acceso a esta información.
+                  Personaliza los colores institucionales, logo oficial, lema y membrete de actas para <strong>{orgName}</strong>.
                 </p>
               </div>
             </div>
@@ -409,24 +516,211 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsEditingOrg(!isEditingOrg)}
-                className="text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl font-bold transition-colors cursor-pointer flex items-center gap-1"
+                className="text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3.5 py-2 rounded-xl font-bold transition-colors cursor-pointer flex items-center gap-1.5 self-start sm:self-auto border border-indigo-100"
               >
-                <span className="material-symbols-outlined text-[16px]">{isEditingOrg ? 'close' : 'edit'}</span>
-                <span>{isEditingOrg ? 'Cancelar' : 'Editar Institución'}</span>
+                <span className="material-symbols-outlined text-[16px]">{isEditingOrg ? 'close' : 'palette'}</span>
+                <span>{isEditingOrg ? 'Cancelar' : 'Personalizar Marca & Colores'}</span>
               </button>
             )}
           </div>
 
           {isEditingOrg ? (
-            <form onSubmit={handleSaveOrgMetadata} className="space-y-4 pt-1">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <form onSubmit={handleSaveOrgMetadata} className="space-y-6 pt-1">
+              {/* Seccion 1: Logo Institucional */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-indigo-600 text-[18px]">image</span>
+                    Logo Oficial del Establecimiento
+                  </span>
+                  <span className="text-[10px] text-slate-400">Formatos: PNG, JPG, SVG, WebP</span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  {/* Vista Previa del Logo Actual */}
+                  <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-slate-300 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-2xs relative group">
+                    {(customLogoInput || orgLogoUrl) ? (
+                      <img
+                        src={customLogoInput || orgLogoUrl}
+                        alt="Logo Preview"
+                        className="w-full h-full object-contain p-1"
+                      />
+                    ) : (
+                      <span className="material-symbols-outlined text-slate-300 text-[32px]">apartment</span>
+                    )}
+                  </div>
+
+                  <div className="flex-1 w-full space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      <input
+                        type="file"
+                        ref={logoFileInputRef}
+                        accept="image/*"
+                        onChange={handleLogoFileUpload}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => logoFileInputRef.current?.click()}
+                        className="px-3 py-1.5 rounded-xl bg-white border border-slate-300 hover:border-indigo-500 hover:bg-indigo-50/50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                      >
+                        <span className="material-symbols-outlined text-indigo-600 text-[18px]">upload_file</span>
+                        <span>Subir Logo desde tu PC</span>
+                      </button>
+
+                      {(orgLogoUrl || customLogoInput) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOrgLogoUrl('');
+                            setCustomLogoInput('');
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold transition-all cursor-pointer"
+                        >
+                          Quitar Logo
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-2.5 top-2 text-slate-400 text-[16px]">link</span>
+                      <input
+                        type="url"
+                        placeholder="O ingresa enlace directo / URL del logo..."
+                        value={customLogoInput || orgLogoUrl}
+                        onChange={(e) => {
+                          setCustomLogoInput(e.target.value);
+                          setOrgLogoUrl(e.target.value);
+                        }}
+                        className="w-full text-xs pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                      />
+                    </div>
+
+                    {/* Presets de Logo */}
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-500 block mb-1">O selecciona un logo predefinido:</span>
+                      <div className="flex flex-wrap gap-2">
+                        {LOGO_PRESETS.map((preset, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              setOrgLogoUrl(preset.url);
+                              setCustomLogoInput(preset.url);
+                            }}
+                            className="text-[11px] font-medium px-2 py-1 rounded-lg bg-white border border-slate-200 hover:border-indigo-400 flex items-center gap-1.5 cursor-pointer text-slate-700"
+                          >
+                            <img src={preset.url} alt={preset.name} className="w-4 h-4 rounded-full object-cover" />
+                            <span>{preset.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Seccion 2: Colores Institucionales */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-indigo-600 text-[18px]">format_color_fill</span>
+                    Paleta de Colores Institucionales
+                  </span>
+                  <span className="text-[10px] text-slate-400">Afecta botones, insignias y membretes</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 block mb-1.5">
+                      Color Primario Institucional
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={orgPrimaryColor}
+                        onChange={(e) => setOrgPrimaryColor(e.target.value)}
+                        className="w-10 h-10 rounded-xl cursor-pointer border border-slate-300 p-0.5 bg-white"
+                      />
+                      <input
+                        type="text"
+                        value={orgPrimaryColor}
+                        onChange={(e) => setOrgPrimaryColor(e.target.value)}
+                        className="text-xs font-mono font-bold uppercase px-3 py-2 rounded-xl border border-slate-200 bg-white w-28 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                      />
+                      <span className="text-[11px] text-slate-500 font-medium">Color principal de la marca</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 block mb-1.5">
+                      Color Secundario / Acento
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={orgSecondaryColor}
+                        onChange={(e) => setOrgSecondaryColor(e.target.value)}
+                        className="w-10 h-10 rounded-xl cursor-pointer border border-slate-300 p-0.5 bg-white"
+                      />
+                      <input
+                        type="text"
+                        value={orgSecondaryColor}
+                        onChange={(e) => setOrgSecondaryColor(e.target.value)}
+                        className="text-xs font-mono font-bold uppercase px-3 py-2 rounded-xl border border-slate-200 bg-white w-28 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                      />
+                      <span className="text-[11px] text-slate-500 font-medium">Color de contraste</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Paletas Rapidas con 1 clic */}
+                <div className="pt-2">
+                  <span className="text-[10px] font-semibold text-slate-500 block mb-1.5">
+                    Temas predefinidos para organizaciones chilenas e internacionales:
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {COLOR_PRESETS.map((preset, idx) => {
+                      const isSelected = orgPrimaryColor.toLowerCase() === preset.color.toLowerCase();
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setOrgPrimaryColor(preset.color);
+                            setOrgSecondaryColor(preset.secondary);
+                          }}
+                          className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
+                            isSelected
+                              ? 'border-indigo-600 bg-indigo-50/60 shadow-xs'
+                              : 'border-slate-200 bg-white hover:border-slate-300'
+                          }`}
+                        >
+                          <span
+                            className="w-5 h-5 rounded-full shrink-0 shadow-2xs border border-white"
+                            style={{ backgroundColor: preset.color }}
+                          />
+                          <div className="min-w-0">
+                            <span className="text-[11px] font-bold text-slate-900 block truncate">{preset.name}</span>
+                            <span className="text-[9px] text-slate-400 block truncate">{preset.label}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Seccion 3: Textos Oficiales, Lema y Membrete */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Nombre de la Institución</label>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Nombre Oficial de la Institución</label>
                   <input
                     type="text"
                     value={orgDisplayName}
                     onChange={(e) => setOrgDisplayName(e.target.value)}
-                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                    placeholder="ej. Colegio San Ignacio El Bosque"
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
                     required
                   />
                 </div>
@@ -436,17 +730,105 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     type="text"
                     value={orgTaxId}
                     onChange={(e) => setOrgTaxId(e.target.value)}
-                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                    placeholder="ej. 76.890.123-K"
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Dominio Corporativo / Web</label>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Lema o Slogan Institucional</label>
+                  <input
+                    type="text"
+                    value={orgSlogan}
+                    onChange={(e) => setOrgSlogan(e.target.value)}
+                    placeholder="ej. Formando personas con vocación y excelencia"
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Dominio Web Institucional</label>
                   <input
                     type="text"
                     value={orgDomain}
                     onChange={(e) => setOrgDomain(e.target.value)}
-                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                    placeholder="ej. colegio.cl"
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
                   />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                    Membrete Oficial de Actas y Documentos
+                  </label>
+                  <input
+                    type="text"
+                    value={orgHeaderText}
+                    onChange={(e) => setOrgHeaderText(e.target.value)}
+                    placeholder="ej. REPÚBLICA DE CHILE — DIRECCIÓN REGIONAL DE EDUCACIÓN — CONSEJO ESCOLAR"
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Este texto encabezará las actas de reunión, exportaciones PDF y respaldos oficiales de este establecimiento.
+                  </span>
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Dirección del Establecimiento / Sede</label>
+                  <input
+                    type="text"
+                    value={orgAddress}
+                    onChange={(e) => setOrgAddress(e.target.value)}
+                    placeholder="ej. Av. Providencia 1234, Santiago"
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Teléfono o Anexo de Contacto</label>
+                  <input
+                    type="text"
+                    value={orgPhone}
+                    onChange={(e) => setOrgPhone(e.target.value)}
+                    placeholder="ej. +56 2 2345 6789"
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Seccion 4: Live Branding Preview */}
+              <div className="p-4 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-2.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Vista Previa en Vivo de Documentos y Marca:
+                </span>
+                <div className="p-4 rounded-xl border border-slate-100 bg-slate-50 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-12 h-12 rounded-xl text-white flex items-center justify-center font-bold text-sm overflow-hidden shrink-0 shadow-xs"
+                      style={{ backgroundColor: orgPrimaryColor }}
+                    >
+                      {(customLogoInput || orgLogoUrl) ? (
+                        <img src={customLogoInput || orgLogoUrl} alt="Logo" className="w-full h-full object-cover" />
+                      ) : (
+                        orgDisplayName.substring(0, 2).toUpperCase()
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900">{orgDisplayName}</h4>
+                      <p className="text-[11px] text-slate-500 italic">
+                        {orgSlogan || 'Lema institucional no configurado'}
+                      </p>
+                      {orgHeaderText && (
+                        <p className="text-[10px] font-mono text-slate-400 uppercase mt-0.5 tracking-tight truncate max-w-md">
+                          {orgHeaderText}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      className="text-[11px] font-bold px-3 py-1.5 rounded-xl text-white shadow-2xs"
+                      style={{ backgroundColor: orgPrimaryColor }}
+                    >
+                      Botón de Muestra
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -454,32 +836,67 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsEditingOrg(false)}
-                  className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs"
+                  className="px-5 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition-all cursor-pointer"
+                  style={{ backgroundColor: orgPrimaryColor }}
                 >
-                  Guardar Datos del Establecimiento
+                  Guardar Identidad Institucional
                 </button>
               </div>
             </form>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Establecimiento</span>
-                <span className="text-xs font-bold text-slate-900 block truncate">{orgName}</span>
+            <div className="space-y-4 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/60">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Establecimiento</span>
+                  <span className="text-xs font-bold text-slate-900 block truncate">{orgName}</span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/60">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">RUT / Identificador</span>
+                  <span className="text-xs font-bold text-slate-800 block">{currentOrganization?.taxId || 'No asignado'}</span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/60">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Color Institucional</span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span
+                      className="w-4 h-4 rounded-full border border-white shadow-xs shrink-0"
+                      style={{ backgroundColor: currentOrganization?.primaryColor || '#4f46e5' }}
+                    />
+                    <span className="text-xs font-mono font-bold text-slate-800 uppercase">
+                      {currentOrganization?.primaryColor || '#4F46E5'}
+                    </span>
+                  </div>
+                </div>
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/60">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Dominio Oficial</span>
+                  <span className="text-xs font-bold text-indigo-700 block truncate">@{currentOrganization?.domain || 'redq.cl'}</span>
+                </div>
               </div>
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">RUT / Identificador</span>
-                <span className="text-xs font-bold text-slate-800 block">{currentOrganization?.taxId || 'No asignado'}</span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Dominio Autorizado</span>
-                <span className="text-xs font-bold text-indigo-700 block">@{currentOrganization?.domain || 'redq.cl'}</span>
-              </div>
+
+              {/* Slogan & Letterhead Display */}
+              {(currentOrganization?.slogan || currentOrganization?.headerText) && (
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/60 text-xs space-y-1">
+                  {currentOrganization.slogan && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Lema:</span>
+                      <span className="text-slate-700 italic font-medium">"{currentOrganization.slogan}"</span>
+                    </div>
+                  )}
+                  {currentOrganization.headerText && (
+                    <div className="flex items-start gap-2 pt-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">Membrete:</span>
+                      <span className="text-slate-600 font-mono text-[11px] leading-tight">
+                        {currentOrganization.headerText}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -706,25 +1123,84 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-2">Seleccionar Avatar</label>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {AVATAR_PRESETS.map((avUrl, index) => (
+              {/* Foto de Perfil / Avatar */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-indigo-600 text-[18px]">account_circle</span>
+                    Foto de Perfil del Usuario
+                  </span>
+                  <span className="text-[10px] text-slate-400">JPG, PNG o WebP (Máx 2MB)</span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  {/* Avatar Preview */}
+                  <div className="relative">
                     <img
-                      key={index}
-                      src={avUrl}
-                      alt={`Avatar ${index}`}
-                      onClick={() => {
-                        setProfileAvatar(avUrl);
-                        setCustomAvatarInput('');
-                      }}
-                      className={`w-10 h-10 rounded-full object-cover cursor-pointer border-2 transition-all ${
-                        profileAvatar === avUrl && !customAvatarInput
-                          ? 'border-indigo-600 ring-2 ring-indigo-200 scale-105'
-                          : 'border-slate-200 hover:border-slate-400 opacity-70 hover:opacity-100'
-                      }`}
+                      src={customAvatarInput.trim() || profileAvatar}
+                      alt="Avatar Preview"
+                      className="w-16 h-16 rounded-full object-cover border-2 border-indigo-200 shadow-sm"
                     />
-                  ))}
+                    <span className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />
+                  </div>
+
+                  <div className="flex-1 w-full space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      <input
+                        type="file"
+                        ref={userAvatarInputRef}
+                        accept="image/*"
+                        onChange={handleUserAvatarUpload}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => userAvatarInputRef.current?.click()}
+                        className="px-3 py-1.5 rounded-xl bg-white border border-slate-300 hover:border-indigo-500 hover:bg-indigo-50/50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                      >
+                        <span className="material-symbols-outlined text-indigo-600 text-[18px]">upload</span>
+                        <span>Subir Foto desde tu PC</span>
+                      </button>
+                    </div>
+
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-2.5 top-2 text-slate-400 text-[16px]">link</span>
+                      <input
+                        type="url"
+                        placeholder="O pega la URL directa de tu foto..."
+                        value={customAvatarInput}
+                        onChange={(e) => {
+                          setCustomAvatarInput(e.target.value);
+                          if (e.target.value.trim()) {
+                            setProfileAvatar(e.target.value.trim());
+                          }
+                        }}
+                        className="w-full text-xs pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                      />
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-500 block mb-1">O elige un avatar de la galería:</span>
+                      <div className="flex flex-wrap gap-2">
+                        {AVATAR_PRESETS.map((avUrl, index) => (
+                          <img
+                            key={index}
+                            src={avUrl}
+                            alt={`Avatar ${index}`}
+                            onClick={() => {
+                              setProfileAvatar(avUrl);
+                              setCustomAvatarInput('');
+                            }}
+                            className={`w-9 h-9 rounded-full object-cover cursor-pointer border-2 transition-all ${
+                              profileAvatar === avUrl && !customAvatarInput
+                                ? 'border-indigo-600 ring-2 ring-indigo-200 scale-105'
+                                : 'border-slate-200 hover:border-slate-400 opacity-70 hover:opacity-100'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 

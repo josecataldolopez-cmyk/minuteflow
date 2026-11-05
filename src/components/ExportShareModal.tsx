@@ -124,15 +124,25 @@ Dirección de ${orgName}`;
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-              <span className="material-symbols-outlined text-[24px]">ios_share</span>
+            <div
+              className="w-10 h-10 rounded-2xl text-white flex items-center justify-center font-bold text-sm overflow-hidden shrink-0 shadow-2xs"
+              style={{ backgroundColor: currentOrganization?.primaryColor || '#4f46e5' }}
+            >
+              {currentOrganization?.logoUrl ? (
+                <img src={currentOrganization.logoUrl} alt={orgName} className="w-full h-full object-cover" />
+              ) : (
+                orgName.substring(0, 2).toUpperCase()
+              )}
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-slate-900">
                   Exportar y Sincronizar Acta
                 </h2>
-                <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-200">
+                <span
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
+                  style={{ backgroundColor: currentOrganization?.primaryColor || '#4f46e5' }}
+                >
                   {orgName}
                 </span>
               </div>

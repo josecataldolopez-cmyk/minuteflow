@@ -101,8 +101,15 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
               title="Cambiar de Establecimiento / Organización"
               className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:border-indigo-400 bg-slate-50 hover:bg-white transition-all cursor-pointer group"
             >
-              <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-                <span className="material-symbols-outlined text-[17px]">domain</span>
+              <div
+                className="w-7 h-7 rounded-lg text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs overflow-hidden"
+                style={{ backgroundColor: activeOrg.primaryColor || '#4f46e5' }}
+              >
+                {activeOrg.logoUrl ? (
+                  <img src={activeOrg.logoUrl} alt={activeOrg.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="material-symbols-outlined text-[17px]">domain</span>
+                )}
               </div>
               <div className="text-left hidden sm:block">
                 <div className="flex items-center gap-1.5">
@@ -155,10 +162,15 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
                         }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
-                            isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'
-                          }`}>
-                            <span className="material-symbols-outlined text-[18px]">domain</span>
+                          <div
+                            className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden text-white"
+                            style={{ backgroundColor: isSelected ? (org.primaryColor || '#4f46e5') : '#64748b' }}
+                          >
+                            {org.logoUrl ? (
+                              <img src={org.logoUrl} alt={org.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="material-symbols-outlined text-[18px]">domain</span>
+                            )}
                           </div>
                           <div className="min-w-0">
                             <h4 className="text-xs font-bold text-slate-900 truncate">{org.name}</h4>

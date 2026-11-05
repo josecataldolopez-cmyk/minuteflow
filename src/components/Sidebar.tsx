@@ -1,5 +1,5 @@
 import React from 'react';
-import { ViewMode } from '../types';
+import { ViewMode, Organization } from '../types';
 
 interface SidebarProps {
   currentView: ViewMode;
@@ -7,6 +7,7 @@ interface SidebarProps {
   onNewMinute: () => void;
   isSyncing: boolean;
   onTriggerSync: () => void;
+  currentOrganization?: Organization;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -14,18 +15,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigate,
   onNewMinute,
   isSyncing,
-  onTriggerSync
+  onTriggerSync,
+  currentOrganization
 }) => {
+  const primaryColor = currentOrganization?.primaryColor || '#4f46e5';
+  const orgLogo = currentOrganization?.logoUrl;
+  const orgName = currentOrganization?.name || 'MinuteFlow';
+
   return (
     <aside className="hidden md:flex flex-col h-screen w-64 border-r border-slate-200 bg-white py-6 px-4 shrink-0 sticky top-0 select-none z-20">
       {/* Brand Header */}
-      <div className="flex items-center gap-3 mb-6 px-2">
-        <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-indigo-100">
-          MF
+      <div className="flex items-center gap-3 mb-6 px-2 min-w-0">
+        <div
+          className="w-10 h-10 rounded-xl text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0 overflow-hidden"
+          style={{ backgroundColor: primaryColor }}
+        >
+          {orgLogo ? (
+            <img src={orgLogo} alt={orgName} className="w-full h-full object-cover" />
+          ) : (
+            orgName.substring(0, 2).toUpperCase()
+          )}
         </div>
-        <div>
-          <h1 className="font-bold text-lg text-slate-900 tracking-tight leading-tight">MinuteFlow</h1>
-          <p className="text-xs text-slate-500 font-medium">Suite Ejecutiva</p>
+        <div className="min-w-0">
+          <h1 className="font-bold text-base text-slate-900 tracking-tight leading-tight truncate" title={orgName}>
+            {orgName}
+          </h1>
+          <p className="text-[11px] text-slate-400 font-medium truncate">
+            {currentOrganization?.slogan || 'Suite Ejecutiva de Actas'}
+          </p>
         </div>
       </div>
 
@@ -34,7 +51,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={onNewMinute}
           id="btn-new-minute-sidebar"
-          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md shadow-indigo-200 hover:shadow-lg transition-all active:scale-98 cursor-pointer"
+          style={{ backgroundColor: primaryColor }}
+          className="w-full text-white text-sm font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md hover:brightness-105 transition-all active:scale-98 cursor-pointer"
         >
           <span className="material-symbols-outlined text-[20px] material-symbols-fill">add</span>
           <span>Nueva Acta</span>
@@ -46,13 +64,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={() => onNavigate('dashboard')}
           id="nav-dashboard"
+          style={currentView === 'dashboard' ? { color: primaryColor, backgroundColor: `${primaryColor}14` } : undefined}
           className={`flex items-center gap-3.5 px-4 py-2.5 rounded-xl transition-all text-left cursor-pointer ${
             currentView === 'dashboard'
-              ? 'bg-indigo-50 text-indigo-600 font-semibold shadow-xs'
+              ? 'font-bold shadow-xs'
               : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
           }`}
         >
-          <span className={`material-symbols-outlined text-[22px] ${currentView === 'dashboard' ? 'material-symbols-fill text-indigo-600' : 'text-slate-400'}`}>
+          <span
+            className={`material-symbols-outlined text-[22px] ${currentView === 'dashboard' ? 'material-symbols-fill' : 'text-slate-400'}`}
+            style={currentView === 'dashboard' ? { color: primaryColor } : undefined}
+          >
             dashboard
           </span>
           <span>Panel Principal</span>
@@ -61,13 +83,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={() => onNavigate('library')}
           id="nav-library"
+          style={currentView === 'library' ? { color: primaryColor, backgroundColor: `${primaryColor}14` } : undefined}
           className={`flex items-center gap-3.5 px-4 py-2.5 rounded-xl transition-all text-left cursor-pointer ${
             currentView === 'library'
-              ? 'bg-indigo-50 text-indigo-600 font-semibold shadow-xs'
+              ? 'font-bold shadow-xs'
               : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
           }`}
         >
-          <span className={`material-symbols-outlined text-[22px] ${currentView === 'library' ? 'material-symbols-fill text-indigo-600' : 'text-slate-400'}`}>
+          <span
+            className={`material-symbols-outlined text-[22px] ${currentView === 'library' ? 'material-symbols-fill' : 'text-slate-400'}`}
+            style={currentView === 'library' ? { color: primaryColor } : undefined}
+          >
             inventory_2
           </span>
           <span>Biblioteca</span>
@@ -76,13 +102,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={() => onNavigate('editor')}
           id="nav-projects"
+          style={(currentView === 'editor' || currentView === 'projects') ? { color: primaryColor, backgroundColor: `${primaryColor}14` } : undefined}
           className={`flex items-center gap-3.5 px-4 py-2.5 rounded-xl transition-all text-left cursor-pointer ${
             currentView === 'editor' || currentView === 'projects'
-              ? 'bg-indigo-50 text-indigo-600 font-semibold shadow-xs'
+              ? 'font-bold shadow-xs'
               : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
           }`}
         >
-          <span className={`material-symbols-outlined text-[22px] ${(currentView === 'editor' || currentView === 'projects') ? 'material-symbols-fill text-indigo-600' : 'text-slate-400'}`}>
+          <span
+            className={`material-symbols-outlined text-[22px] ${(currentView === 'editor' || currentView === 'projects') ? 'material-symbols-fill' : 'text-slate-400'}`}
+            style={(currentView === 'editor' || currentView === 'projects') ? { color: primaryColor } : undefined}
+          >
             folder_shared
           </span>
           <span>Proyectos</span>
@@ -91,13 +121,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={() => onNavigate('settings')}
           id="nav-settings"
+          style={currentView === 'settings' ? { color: primaryColor, backgroundColor: `${primaryColor}14` } : undefined}
           className={`flex items-center gap-3.5 px-4 py-2.5 rounded-xl transition-all text-left cursor-pointer ${
             currentView === 'settings'
-              ? 'bg-indigo-50 text-indigo-600 font-semibold shadow-xs'
+              ? 'font-bold shadow-xs'
               : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
           }`}
         >
-          <span className={`material-symbols-outlined text-[22px] ${currentView === 'settings' ? 'material-symbols-fill text-indigo-600' : 'text-slate-400'}`}>
+          <span
+            className={`material-symbols-outlined text-[22px] ${currentView === 'settings' ? 'material-symbols-fill' : 'text-slate-400'}`}
+            style={currentView === 'settings' ? { color: primaryColor } : undefined}
+          >
             settings
           </span>
           <span>Configuración</span>

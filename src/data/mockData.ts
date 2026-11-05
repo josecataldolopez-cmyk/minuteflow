@@ -19,7 +19,10 @@ export const INITIAL_ORGANIZATIONS: Organization[] = [
     driveWebhookUrl: '',
     logoUrl: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=100&auto=format&fit=crop&q=80',
     plan: 'Enterprise Multi-Tenant',
-    createdAt: '2026-01-15'
+    createdAt: '2026-01-15',
+    primaryColor: '#4f46e5',
+    slogan: 'Innovación y Gobernanza Tecnológica',
+    headerText: 'REDQ Consultores & Tecnología SpA — Dirección Ejecutiva y Auditoría'
   },
   {
     id: 'org-colegio',
@@ -31,7 +34,10 @@ export const INITIAL_ORGANIZATIONS: Organization[] = [
     driveWebhookUrl: '',
     logoUrl: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=100&auto=format&fit=crop&q=80',
     plan: 'Plan Educacional Plus',
-    createdAt: '2026-02-01'
+    createdAt: '2026-02-01',
+    primaryColor: '#059669',
+    slogan: 'Formando hombres y mujeres para los demás',
+    headerText: 'Colegio San Ignacio El Bosque — Consejo de Dirección y Equipo Técnico Pedagógico'
   },
   {
     id: 'org-clinica',
@@ -43,7 +49,10 @@ export const INITIAL_ORGANIZATIONS: Organization[] = [
     driveWebhookUrl: '',
     logoUrl: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=100&auto=format&fit=crop&q=80',
     plan: 'Plan Salud Pro',
-    createdAt: '2026-03-10'
+    createdAt: '2026-03-10',
+    primaryColor: '#0284c7',
+    slogan: 'Compromiso con la salud y excelencia clínica',
+    headerText: 'Clínica Médica Central — Comité de Ética Asistencial y Dirección Médica'
   }
 ];
 

@@ -450,6 +450,7 @@ export default function App() {
         onNewMinute={handleNewMinute}
         isSyncing={isSyncing}
         onTriggerSync={handleTriggerSync}
+        currentOrganization={currentOrganization}
       />
 
       {/* Main Content Area */}

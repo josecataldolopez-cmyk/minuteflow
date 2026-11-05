@@ -21,6 +21,12 @@ export interface Organization {
   logoUrl?: string;
   plan?: string;
   createdAt?: string;
+  primaryColor?: string; // Color hexadecimal principal de la institución
+  secondaryColor?: string;
+  slogan?: string;
+  headerText?: string; // Membrete oficial de actas
+  address?: string;
+  phone?: string;
 }
 
 export interface Attendee {
