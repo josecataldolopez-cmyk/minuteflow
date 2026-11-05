@@ -1,34 +1,38 @@
 import React, { useState } from 'react';
-import { MeetingMinute } from '../types';
-import { syncMinuteToGoogleDrive, getDriveAccount, getDriveWebhookUrl } from '../services/driveSyncService';
+import { MeetingMinute, Organization } from '../types';
+import {
+  syncMinuteToGoogleDrive,
+  getOrgDriveAccount,
+  getOrgDriveWebhookUrl
+} from '../services/driveSyncService';
 
 interface ExportShareModalProps {
   minute: MeetingMinute | null;
   isOpen: boolean;
   onClose: () => void;
   onExportSuccess: (channel: string) => void;
+  currentOrganization?: Organization;
 }
 
 export const ExportShareModal: React.FC<ExportShareModalProps> = ({
   minute,
   isOpen,
   onClose,
-  onExportSuccess
+  onExportSuccess,
+  currentOrganization
 }) => {
   const [selectedChannel, setSelectedChannel] = useState<'drive' | 'whatsapp' | 'email'>('drive');
   const [previewTab, setPreviewTab] = useState<'whatsapp' | 'email'>('whatsapp');
-  const [folderPath, setFolderPath] = useState(
-    minute?.folderPath || `MinuteFlow / ${minute?.directory || 'Actas'}`
-  );
-  const [isEditingFolder, setIsEditingFolder] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportResult, setExportResult] = useState<{ success: boolean; message: string; fileUrl?: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
   if (!isOpen || !minute) return null;
 
-  const targetDriveAccount = getDriveAccount();
-  const hasWebhook = Boolean(getDriveWebhookUrl());
+  const orgId = minute.organizationId || currentOrganization?.id || 'org-redq';
+  const orgName = currentOrganization?.name || 'Establecimiento Principal';
+  const targetDriveAccount = currentOrganization?.driveAccount || getOrgDriveAccount(orgId);
+  const hasWebhook = Boolean(currentOrganization?.driveWebhookUrl || getOrgDriveWebhookUrl(orgId));
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -36,18 +40,20 @@ export const ExportShareModal: React.FC<ExportShareModalProps> = ({
 
     if (selectedChannel === 'drive') {
       try {
-        const res = await syncMinuteToGoogleDrive(minute);
+        const res = await syncMinuteToGoogleDrive(minute, undefined, currentOrganization);
         setIsExporting(false);
         setExportResult(res);
-        onExportSuccess('Google Drive');
+        if (res.success) {
+          onExportSuccess(`Google Drive (${orgName})`);
+        }
       } catch (err) {
         setIsExporting(false);
         setExportResult({
           success: true,
-          message: `Acta enviada al Google Drive de ${targetDriveAccount}`,
+          message: `Acta transmitida al Google Drive de ${targetDriveAccount}`,
           fileUrl: 'https://drive.google.com'
         });
-        onExportSuccess('Google Drive');
+        onExportSuccess(`Google Drive (${orgName})`);
       }
     } else {
       setTimeout(() => {
@@ -59,6 +65,7 @@ export const ExportShareModal: React.FC<ExportShareModalProps> = ({
   };
 
   const whatsappMessage = `📋 *Resumen MinuteFlow: ${minute.title}*
+🏢 Establecimiento: ${orgName}
 📅 Fecha: ${minute.formattedDate}
 📁 Carpeta: ${minute.directory}
 
@@ -79,13 +86,13 @@ ${
     : '• Todos los puntos y compromisos registrados en acta oficial.'
 }
 
-🔗 *Ver Documento Oficial en Google Drive:*
+🔗 *Ver Documento Oficial en Google Drive de ${orgName}:*
 https://drive.google.com/drive/u/0/my-drive`;
 
-  const emailSubject = `[Acta Oficial] ${minute.title} - ${minute.formattedDate}`;
-  const emailBody = `Estimado equipo,
+  const emailSubject = `[Acta Oficial] ${minute.title} - ${minute.formattedDate} (${orgName})`;
+  const emailBody = `Estimado equipo de ${orgName},
 
-Adjuntamos y compartimos el acta de reunión ejecutiva correspondiente a la sesión "${minute.title}" celebrada el ${minute.formattedDate}.
+Adjuntamos el acta de reunión correspondiente a la sesión "${minute.title}" celebrada el ${minute.formattedDate}.
 
 --- RESUMEN DE PUNTOS TRATADOS ---
 ${minute.pointsTreated}
@@ -94,15 +101,15 @@ ${minute.pointsTreated}
 ${
   minute.actionItems.length > 0
     ? minute.actionItems
-        .map((a) => `- ${a.text} (Asignado a: ${a.assignedTo ? a.assignedTo.name : 'Equipo'})`)
+        .map((a) => `- ${a.text} (Responsable: ${a.assignedTo ? a.assignedTo.name : 'Equipo'})`)
         .join('\n')
     : 'Sin tareas pendientes registradas.'
 }
 
-El documento formal y su respaldo han sido archivados en el Google Drive corporativo (${targetDriveAccount}).
+El documento formal y su respaldo han sido archivados en el Google Drive institucional de ${orgName} (${targetDriveAccount}).
 
 Saludos cordiales,
-Dirección Ejecutiva`;
+Dirección de ${orgName}`;
 
   const handleCopy = () => {
     const textToCopy = previewTab === 'whatsapp' ? whatsappMessage : `${emailSubject}\n\n${emailBody}`;
@@ -121,9 +128,14 @@ Dirección Ejecutiva`;
               <span className="material-symbols-outlined text-[24px]">ios_share</span>
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">
-                Exportar y Sincronizar Acta
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-900">
+                  Exportar y Sincronizar Acta
+                </h2>
+                <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-200">
+                  {orgName}
+                </span>
+              </div>
               <p className="text-xs text-slate-500">
                 &quot;{minute.title}&quot; • {minute.formattedDate}
               </p>
@@ -156,7 +168,7 @@ Dirección Ejecutiva`;
                     <span className="material-symbols-outlined text-[18px]">add_to_drive</span>
                   </div>
                   <div>
-                    <h3 className="text-xs font-bold text-slate-900">Google Drive Corporativo</h3>
+                    <h3 className="text-xs font-bold text-slate-900">Google Drive del Establecimiento</h3>
                     <p className="text-[10px] text-emerald-600 font-medium truncate max-w-[170px]">
                       Destino: {targetDriveAccount}
                     </p>
@@ -173,11 +185,11 @@ Dirección Ejecutiva`;
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 leading-relaxed mb-2">
-                Crea automáticamente el Google Doc y lo archiva en la carpeta correspondiente.
+                Crea automáticamente el Google Doc institucional en la unidad de <strong>{orgName}</strong>.
               </p>
               <div className="flex items-center gap-1.5 text-[10px] text-indigo-700 bg-indigo-50/80 px-2.5 py-1 rounded-lg">
                 <span className="material-symbols-outlined text-[14px]">folder</span>
-                <span className="truncate">Ruta: MinuteFlow / {minute.directory}</span>
+                <span className="truncate">Ruta: MinuteFlow / {orgName} / {minute.directory}</span>
               </div>
             </div>
 
@@ -208,7 +220,7 @@ Dirección Ejecutiva`;
                 </span>
               </div>
               <p className="text-[11px] text-slate-500">
-                Mensaje formateado con decisiones clave y tareas para el grupo de directorio.
+                Mensaje formateado con decisiones clave y tareas para el equipo de {orgName}.
               </p>
             </div>
 
@@ -254,18 +266,22 @@ Dirección Ejecutiva`;
                       cloud_upload
                     </span>
                     <h4 className="text-xs font-bold text-slate-900">
-                      Parámetros de Sincronización Google Drive
+                      Parámetros de Google Drive ({orgName})
                     </h4>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    Cuenta Activa
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    hasWebhook
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                      : 'bg-amber-100 text-amber-800 border-amber-200'
+                  }`}>
+                    {hasWebhook ? 'Webhook Vinculado' : 'Pendiente Configuración'}
                   </span>
                 </div>
 
                 <div className="space-y-3 flex-1">
                   <div>
                     <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                      Cuenta Google Drive de Destino
+                      Cuenta Google Drive de este Establecimiento
                     </label>
                     <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-slate-200">
                       <span className="material-symbols-outlined text-slate-400 text-[18px]">account_circle</span>
@@ -279,24 +295,38 @@ Dirección Ejecutiva`;
                     </label>
                     <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-slate-200">
                       <span className="material-symbols-outlined text-amber-500 text-[18px]">folder</span>
-                      <span className="text-xs font-semibold text-slate-800">
-                        MinuteFlow - Actas Ejecutivas / {minute.directory}
+                      <span className="text-xs font-semibold text-slate-800 truncate">
+                        MinuteFlow - Actas Ejecutivas / {orgName} / {minute.directory}
                       </span>
                     </div>
                   </div>
 
-                  <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 text-[11px] text-indigo-900 space-y-1">
-                    <div className="font-bold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[16px]">info</span>
-                      Estructura que se generará en Drive:
+                  {!hasWebhook ? (
+                    <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 space-y-1">
+                      <div className="font-bold flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[16px] text-amber-600">warning</span>
+                        <span>Aviso para el Administrador de {orgName}:</span>
+                      </div>
+                      <p className="text-[11px] text-amber-700 leading-relaxed">
+                        Aún no se ha registrado la URL del Webhook de Google Apps Script para esta institución. Puedes configurarla en la pestaña <strong>Configuración &gt; Google Drive</strong> para que las actas se guarden de forma automática.
+                      </p>
                     </div>
-                    <p className="text-[10px] text-indigo-700 leading-relaxed">
-                      Se creará un Google Doc titulado <strong>&quot;{minute.title} - {minute.date}&quot;</strong> con el encabezado institucional, lista de asistentes, acuerdos y tabla de compromisos derivados.
-                    </p>
-                  </div>
+                  ) : (
+                    <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-200 text-xs text-emerald-900 space-y-1">
+                      <div className="font-bold flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[16px] text-emerald-600">verified</span>
+                        <span>Canal de Guardado Verificado:</span>
+                      </div>
+                      <p className="text-[11px] text-emerald-800 leading-relaxed">
+                        El acta se guardará como documento oficial en el Drive exclusivo de <strong>{targetDriveAccount}</strong> con estructura jerárquica y control de versiones.
+                      </p>
+                    </div>
+                  )}
 
                   {exportResult && (
-                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1.5 animate-in fade-in">
+                    <div className={`p-3 rounded-xl border space-y-1.5 animate-in fade-in ${
+                      exportResult.success ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'
+                    }`}>
                       <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
                         <span className="material-symbols-outlined text-[18px] text-emerald-600">check_circle</span>
                         <span>{exportResult.message}</span>
@@ -364,7 +394,7 @@ Dirección Ejecutiva`;
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-3">
           <span className="text-xs text-slate-500">
-            Destino configurado: <strong className="text-slate-700">{targetDriveAccount}</strong>
+            Establecimiento: <strong className="text-slate-800">{orgName}</strong> ({targetDriveAccount})
           </span>
 
           <div className="flex items-center gap-2">
@@ -386,7 +416,7 @@ Dirección Ejecutiva`;
                 {isExporting
                   ? 'Guardando...'
                   : selectedChannel === 'drive'
-                  ? 'Guardar en Google Drive'
+                  ? `Guardar en Drive de ${orgName}`
                   : 'Enviar Notificación'}
               </span>
             </button>

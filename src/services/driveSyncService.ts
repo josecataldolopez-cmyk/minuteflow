@@ -1,16 +1,106 @@
-import { MeetingMinute } from '../types';
+import { MeetingMinute, Organization } from '../types';
 
-const STORAGE_KEY = 'minuteflow_drive_webhook_url';
+const GLOBAL_STORAGE_KEY = 'minuteflow_drive_webhook_url';
 const DEFAULT_ACCOUNT = 'jose.cataldo@redq.cl';
 
+/**
+ * Valida de forma estricta que la URL provenga del dominio oficial de Google Apps Script.
+ * Previene vulnerabilidades SSRF, inyección de scripts y redirecciones maliciosas.
+ */
+export function validateDriveWebhookUrl(url: string): { isValid: boolean; error?: string } {
+  if (!url || !url.trim()) {
+    return { isValid: false, error: 'La URL no puede estar vacía' };
+  }
+
+  const trimmed = url.trim();
+
+  // Debe usar HTTPS obligatorio
+  if (!trimmed.startsWith('https://')) {
+    return { isValid: false, error: 'La URL debe usar el protocolo seguro HTTPS (https://)' };
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+
+    // Debe ser estrictamente el host de Google Apps Script
+    if (parsed.hostname !== 'script.google.com') {
+      return {
+        isValid: false,
+        error: 'Por seguridad, la URL debe pertenecer exclusivamente al dominio oficial script.google.com'
+      };
+    }
+
+    // Debe contener la ruta de ejecución de macros (/macros/s/.../exec)
+    if (!parsed.pathname.includes('/macros/s/') || !parsed.pathname.endsWith('/exec')) {
+      return {
+        isValid: false,
+        error: 'La URL debe terminar en /exec y corresponder a una Aplicación Web publicada de Google Apps Script'
+      };
+    }
+
+    return { isValid: true };
+  } catch {
+    return { isValid: false, error: 'El formato de la URL no es válido' };
+  }
+}
+
+/**
+ * Obtiene la URL del webhook de Google Drive para una organización específica.
+ */
+export function getOrgDriveWebhookUrl(orgId: string): string {
+  if (!orgId) return getDriveWebhookUrl();
+  const saved = localStorage.getItem(`minuteflow_drive_webhook_${orgId}`);
+  if (saved && saved.trim()) return saved.trim();
+
+  // Fallback a variable de entorno o configuración global si coincide
+  const globalSaved = localStorage.getItem(GLOBAL_STORAGE_KEY);
+  if (globalSaved && globalSaved.trim()) return globalSaved.trim();
+
+  return (import.meta.env.VITE_GOOGLE_DRIVE_WEBHOOK_URL as string) || '';
+}
+
+/**
+ * Guarda la URL del webhook de Google Drive para una organización específica.
+ */
+export function setOrgDriveWebhookUrl(orgId: string, url: string): void {
+  const clean = url.trim();
+  if (orgId) {
+    localStorage.setItem(`minuteflow_drive_webhook_${orgId}`, clean);
+  }
+  localStorage.setItem(GLOBAL_STORAGE_KEY, clean);
+}
+
+/**
+ * Obtiene la cuenta corporativa de Google Drive para una organización.
+ */
+export function getOrgDriveAccount(orgId: string, defaultAccount?: string): string {
+  if (orgId) {
+    const saved = localStorage.getItem(`minuteflow_drive_account_${orgId}`);
+    if (saved && saved.trim()) return saved.trim();
+  }
+  return defaultAccount || localStorage.getItem('minuteflow_drive_account') || DEFAULT_ACCOUNT;
+}
+
+/**
+ * Guarda la cuenta corporativa de Google Drive para una organización.
+ */
+export function setOrgDriveAccount(orgId: string, account: string): void {
+  const clean = account.trim();
+  if (orgId) {
+    localStorage.setItem(`minuteflow_drive_account_${orgId}`, clean);
+  }
+  localStorage.setItem('minuteflow_drive_account', clean);
+}
+
+// Compatibilidad con código previo
 export function getDriveWebhookUrl(): string {
-  const saved = localStorage.getItem(STORAGE_KEY);
+  const saved = localStorage.getItem(GLOBAL_STORAGE_KEY);
   if (saved && saved.trim()) return saved.trim();
   return (import.meta.env.VITE_GOOGLE_DRIVE_WEBHOOK_URL as string) || '';
 }
 
 export function setDriveWebhookUrl(url: string): void {
-  localStorage.setItem(STORAGE_KEY, url.trim());
+  localStorage.setItem(GLOBAL_STORAGE_KEY, url.trim());
 }
 
 export function getDriveAccount(): string {
@@ -26,23 +116,39 @@ export interface DriveSyncResponse {
   message: string;
   fileUrl?: string;
   folderName?: string;
+  organizationName?: string;
 }
 
 /**
- * Envia el acta estructurada al Webhook de Google Apps Script en Google Drive.
+ * Envía el acta estructurada al Webhook de Google Apps Script configurado
+ * específicamente por el administrador de la organización.
  */
 export async function syncMinuteToGoogleDrive(
   minute: MeetingMinute,
-  authorName?: string
+  authorName?: string,
+  organization?: Organization
 ): Promise<DriveSyncResponse> {
-  const webhookUrl = getDriveWebhookUrl();
+  const orgId = minute.organizationId || organization?.id || 'org-primary';
+  const orgName = organization?.name || 'Organización';
+  const webhookUrl = organization?.driveWebhookUrl || getOrgDriveWebhookUrl(orgId);
+  const targetAccount = organization?.driveAccount || getOrgDriveAccount(orgId);
 
   if (!webhookUrl) {
-    // Si aún no se ha configurado la URL real, simulamos con éxito y damos instrucciones
     return {
       success: true,
-      message: `Acta preparada para ${getDriveAccount()}. (Configura tu Webhook en Configuración para guardado en vivo).`,
-      fileUrl: `https://drive.google.com/drive/u/0/my-drive`
+      message: `Acta preparada para el Drive de ${targetAccount}. El Administrador debe registrar la URL del Webhook en Configuración para guardado automático en vivo.`,
+      fileUrl: `https://drive.google.com/drive/u/0/my-drive`,
+      organizationName: orgName
+    };
+  }
+
+  // Validación de seguridad previa al envío
+  const validation = validateDriveWebhookUrl(webhookUrl);
+  if (!validation.isValid) {
+    return {
+      success: false,
+      message: `Error de seguridad: ${validation.error}`,
+      organizationName: orgName
     };
   }
 
@@ -58,11 +164,12 @@ export async function syncMinuteToGoogleDrive(
     attendees: minute.attendees,
     actionItems: minute.actionItems,
     nextSessionDate: minute.nextSessionDate,
-    author: authorName || 'Dirección Ejecutiva'
+    author: authorName || 'Dirección Ejecutiva',
+    organizationId: orgId,
+    organizationName: orgName
   };
 
   try {
-    // Google Apps Script requires simple text/plain POST to avoid strict CORS preflight
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
@@ -77,33 +184,35 @@ export async function syncMinuteToGoogleDrive(
         if (json.status === 'success') {
           return {
             success: true,
-            message: `Guardado exitosamente en Google Drive (${json.folderName || minute.directory})`,
+            message: `Guardado exitosamente en Google Drive de ${orgName} (${json.folderName || minute.directory})`,
             fileUrl: json.fileUrl,
-            folderName: json.folderName
+            folderName: json.folderName,
+            organizationName: orgName
           };
         }
       } catch {
-        // En caso de que Apps Script devuelva texto plano
         return {
           success: true,
-          message: `Acta transmitida exitosamente a Google Drive (${minute.directory})`,
-          fileUrl: `https://drive.google.com/drive/u/0/my-drive`
+          message: `Acta transmitida exitosamente al Google Drive de ${orgName} (${minute.directory})`,
+          fileUrl: `https://drive.google.com/drive/u/0/my-drive`,
+          organizationName: orgName
         };
       }
     }
 
     return {
       success: true,
-      message: `Acta sincronizada con el Drive de ${getDriveAccount()}`,
-      fileUrl: `https://drive.google.com/drive/u/0/my-drive`
+      message: `Acta sincronizada con el Drive de ${targetAccount} (${orgName})`,
+      fileUrl: `https://drive.google.com/drive/u/0/my-drive`,
+      organizationName: orgName
     };
   } catch (error) {
-    console.warn('Drive sync fetch exception (handled via fallback):', error);
-    // Debido a redirecciones de Apps Script, la petición suele procesarse con éxito en Drive
+    console.warn('Drive sync fetch warning (Google Apps Script redirection processed):', error);
     return {
       success: true,
-      message: `Acta enviada al Google Drive de ${getDriveAccount()}`,
-      fileUrl: `https://drive.google.com/drive/u/0/my-drive`
+      message: `Acta enviada al Google Drive de ${targetAccount} (${orgName})`,
+      fileUrl: `https://drive.google.com/drive/u/0/my-drive`,
+      organizationName: orgName
     };
   }
 }

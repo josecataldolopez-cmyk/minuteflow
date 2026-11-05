@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MeetingMinute, Attendee, ActionItem, DirectoryItem, MinuteStatus } from '../types';
+import { MeetingMinute, Attendee, ActionItem, DirectoryItem, MinuteStatus, Organization, UserRole } from '../types';
 import { ContactPickerModal } from './ContactPickerModal';
 import { analyzeAndEnhanceMinute } from '../services/aiService';
 
@@ -15,6 +15,8 @@ interface MinuteEditorViewProps {
   onDeleteContact?: (id: string) => void;
   onCreateDirectory?: (name: string) => void;
   onDeleteMinute?: (id: string) => void;
+  currentOrganization?: Organization;
+  userRole?: UserRole;
 }
 
 export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
@@ -28,8 +30,11 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
   onUpdateContact,
   onDeleteContact,
   onCreateDirectory,
-  onDeleteMinute
+  onDeleteMinute,
+  currentOrganization,
+  userRole = 'admin'
 }) => {
+  const canEdit = userRole === 'superadmin' || userRole === 'admin' || userRole === 'editor';
   // Form State
   const defaultDir = directories.length > 0 ? directories[0].name : 'Reuniones de Directorio Q3';
   const [title, setTitle] = useState(minute ? minute.title : '');
@@ -284,7 +289,8 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
       nextSessionDate,
       syncCalendar,
       folderPath: `${directory} / Notas`,
-      lastEdited: 'Justo ahora'
+      lastEdited: 'Justo ahora',
+      organizationId: minute?.organizationId || currentOrganization?.id || 'org-redq'
     };
 
     onSave(updatedMinute, isDraft);
@@ -390,14 +396,16 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
 
           {minute && (
             <>
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="px-3 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer"
-                title="Eliminar esta acta"
-              >
-                <span className="material-symbols-outlined text-[16px]">delete</span>
-                <span className="hidden sm:inline">Eliminar</span>
-              </button>
+              {canEdit && (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="px-3 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer"
+                  title="Eliminar esta acta"
+                >
+                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                  <span className="hidden sm:inline">Eliminar</span>
+                </button>
+              )}
               <button
                 onClick={() => onOpenExport(minute)}
                 className="px-3 py-2 rounded-xl border border-slate-200 hover:border-indigo-600 text-indigo-600 text-xs font-semibold hover:bg-indigo-50/50 transition-all flex items-center gap-1 cursor-pointer"
@@ -408,19 +416,28 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
             </>
           )}
 
-          <button
-            onClick={() => handleSave(true)}
-            className="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-all cursor-pointer"
-          >
-            Guardar Borrador
-          </button>
-          <button
-            onClick={() => handleSave(false)}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-100 flex items-center gap-1.5 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[16px]">save</span>
-            <span>Aprobar y Guardar</span>
-          </button>
+          {canEdit ? (
+            <>
+              <button
+                onClick={() => handleSave(true)}
+                className="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-all cursor-pointer"
+              >
+                Guardar Borrador
+              </button>
+              <button
+                onClick={() => handleSave(false)}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-100 flex items-center gap-1.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">save</span>
+                <span>Aprobar y Guardar</span>
+              </button>
+            </>
+          ) : (
+            <span className="px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200 flex items-center gap-1">
+              <span className="material-symbols-outlined text-[16px]">visibility</span>
+              <span>Solo Lectura</span>
+            </span>
+          )}
         </div>
       </header>
 

@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { UserProfile, Attendee, DirectoryItem, MeetingMinute } from '../types';
-import { AVATAR_PRESETS, INITIAL_ATTENDEES } from '../data/mockData';
+import React, { useState, useEffect } from 'react';
+import { UserProfile, Attendee, DirectoryItem, MeetingMinute, Organization, UserRole } from '../types';
+import { AVATAR_PRESETS } from '../data/mockData';
 import {
-  getDriveAccount,
-  setDriveAccount,
-  getDriveWebhookUrl,
-  setDriveWebhookUrl,
+  getOrgDriveAccount,
+  setOrgDriveAccount,
+  getOrgDriveWebhookUrl,
+  setOrgDriveWebhookUrl,
+  validateDriveWebhookUrl,
   syncMinuteToGoogleDrive
 } from '../services/driveSyncService';
 
@@ -27,6 +28,9 @@ interface SettingsViewProps {
   onDeleteSampleMinutes?: () => void;
   onClearAllMinutes?: () => void;
   onResetSampleMinutes?: () => void;
+  currentOrganization?: Organization;
+  onUpdateOrganization?: (updatedOrg: Organization) => void;
+  userRole?: UserRole;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -46,8 +50,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   minutesCount = 0,
   onDeleteSampleMinutes,
   onClearAllMinutes,
-  onResetSampleMinutes
+  onResetSampleMinutes,
+  currentOrganization,
+  onUpdateOrganization,
+  userRole = 'admin'
 }) => {
+  const orgId = currentOrganization?.id || 'org-redq';
+  const orgName = currentOrganization?.name || 'Establecimiento Principal';
+  const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+
   // Profile Edit State
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileName, setProfileName] = useState(userProfile.name);
@@ -92,17 +103,32 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [showDeleteSampleDialog, setShowDeleteSampleDialog] = useState(false);
   const [showClearAllDialog, setShowClearAllDialog] = useState(false);
 
-  // Google Drive & Channels State
-  const [driveEnabled, setDriveEnabled] = useState(true);
-  const [driveAccount, setDriveAccountState] = useState(getDriveAccount());
-  const [driveWebhookUrl, setDriveWebhookUrlState] = useState(getDriveWebhookUrl());
+  // Organization & Google Drive States
+  const [driveAccount, setDriveAccountState] = useState(() =>
+    getOrgDriveAccount(orgId, currentOrganization?.driveAccount)
+  );
+  const [driveWebhookUrl, setDriveWebhookUrlState] = useState(() =>
+    currentOrganization?.driveWebhookUrl || getOrgDriveWebhookUrl(orgId)
+  );
+  const [driveUrlError, setDriveUrlError] = useState<string | null>(null);
   const [showDriveGuide, setShowDriveGuide] = useState(false);
   const [isTestingDrive, setIsTestingDrive] = useState(false);
 
-  const [whatsappEnabled, setWhatsappEnabled] = useState(true);
-  const [emailAutoSend, setEmailAutoSend] = useState(false);
-  const [language, setLanguage] = useState('es-ES');
-  const [autoSync, setAutoSync] = useState(true);
+  // Organization Metadata Edit State
+  const [isEditingOrg, setIsEditingOrg] = useState(false);
+  const [orgDisplayName, setOrgDisplayName] = useState(orgName);
+  const [orgTaxId, setOrgTaxId] = useState(currentOrganization?.taxId || '');
+  const [orgDomain, setOrgDomain] = useState(currentOrganization?.domain || '');
+
+  // Sincronizar estados locales cuando cambia la organización seleccionada
+  useEffect(() => {
+    setDriveAccountState(getOrgDriveAccount(orgId, currentOrganization?.driveAccount));
+    setDriveWebhookUrlState(currentOrganization?.driveWebhookUrl || getOrgDriveWebhookUrl(orgId));
+    setOrgDisplayName(currentOrganization?.name || 'Establecimiento Principal');
+    setOrgTaxId(currentOrganization?.taxId || '');
+    setOrgDomain(currentOrganization?.domain || '');
+    setDriveUrlError(null);
+  }, [orgId, currentOrganization]);
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,6 +151,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     onShowToast('Perfil de usuario actualizado exitosamente.');
   };
 
+  const handleSaveOrgMetadata = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAdmin) {
+      onShowToast('Acción no permitida: Solo los Administradores pueden editar la institución.');
+      return;
+    }
+    if (currentOrganization && onUpdateOrganization) {
+      const updated: Organization = {
+        ...currentOrganization,
+        name: orgDisplayName.trim() || currentOrganization.name,
+        taxId: orgTaxId.trim() || currentOrganization.taxId,
+        domain: orgDomain.trim() || currentOrganization.domain
+      };
+      onUpdateOrganization(updated);
+      setIsEditingOrg(false);
+      onShowToast(`Datos de ${updated.name} actualizados correctamente.`);
+    }
+  };
+
   const handleCreateContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!contactName.trim()) {
@@ -138,8 +183,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       role: contactRole.trim() || 'Miembro del Equipo',
       email:
         contactEmail.trim() ||
-        `${contactName.toLowerCase().replace(/\s+/g, '.')}@empresa.com`,
-      avatarUrl: contactCustomAvatar.trim() || contactAvatar
+        `${contactName.toLowerCase().replace(/\s+/g, '.')}@${currentOrganization?.domain || 'empresa.com'}`,
+      avatarUrl: contactCustomAvatar.trim() || contactAvatar,
+      organizationId: orgId
     };
 
     onCreateContact(newContact);
@@ -148,7 +194,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setContactEmail('');
     setContactCustomAvatar('');
     setIsAddingContact(false);
-    onShowToast(`Asistente "${newContact.name}" agregado al directorio.`);
+    onShowToast(`Asistente "${newContact.name}" agregado al directorio de ${orgName}.`);
   };
 
   const startEditContact = (att: Attendee) => {
@@ -172,7 +218,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       name: editName.trim(),
       role: editRole.trim() || 'Miembro del Directorio',
       email: editEmail.trim() || editingContact.email,
-      avatarUrl: editCustomAvatar.trim() || editAvatar
+      avatarUrl: editCustomAvatar.trim() || editAvatar,
+      organizationId: editingContact.organizationId || orgId
     };
 
     onUpdateContact(updated);
@@ -221,53 +268,88 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleSaveDriveConfig = (e: React.FormEvent) => {
     e.preventDefault();
-    setDriveAccount(driveAccount);
-    setDriveWebhookUrl(driveWebhookUrl);
-    onShowToast(`Configuración de Google Drive guardada para ${driveAccount}`);
+
+    if (!isAdmin) {
+      onShowToast('Acceso Denegado: Solo administradores pueden guardar la configuración de Drive.');
+      return;
+    }
+
+    // Validación estricta de seguridad
+    if (driveWebhookUrl.trim()) {
+      const validation = validateDriveWebhookUrl(driveWebhookUrl);
+      if (!validation.isValid) {
+        setDriveUrlError(validation.error || 'URL inválida');
+        onShowToast(`Error de Seguridad: ${validation.error}`);
+        return;
+      }
+    }
+    setDriveUrlError(null);
+
+    setOrgDriveAccount(orgId, driveAccount);
+    setOrgDriveWebhookUrl(orgId, driveWebhookUrl);
+
+    if (currentOrganization && onUpdateOrganization) {
+      onUpdateOrganization({
+        ...currentOrganization,
+        driveAccount: driveAccount.trim(),
+        driveWebhookUrl: driveWebhookUrl.trim()
+      });
+    }
+
+    onShowToast(`Parámetros de Google Drive actualizados para ${orgName}`);
   };
 
   const handleTestDriveConnection = async () => {
     setIsTestingDrive(true);
-    setDriveAccount(driveAccount);
-    setDriveWebhookUrl(driveWebhookUrl);
+
+    if (driveWebhookUrl.trim()) {
+      const validation = validateDriveWebhookUrl(driveWebhookUrl);
+      if (!validation.isValid) {
+        setIsTestingDrive(false);
+        setDriveUrlError(validation.error || 'URL inválida');
+        onShowToast(`Error de Validación: ${validation.error}`);
+        return;
+      }
+    }
+
+    setDriveUrlError(null);
+    setOrgDriveAccount(orgId, driveAccount);
+    setOrgDriveWebhookUrl(orgId, driveWebhookUrl);
 
     const testMinute: MeetingMinute = {
       id: `min-test-${Date.now()}`,
-      title: 'Acta de Prueba de Conexión Google Drive',
+      title: `Acta de Prueba de Conexión - ${orgName}`,
       directory: 'Pruebas de Sistema',
       date: new Date().toISOString().split('T')[0],
       formattedDate: new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric', year: 'numeric' }),
       time: '12:00',
       status: 'Aprobada',
-      objectives: 'Verificar la comunicación automática entre MinuteFlow y Google Drive.',
-      pointsTreated: '• Conexión establecida con éxito.\n• Estructura de carpetas y permisos operativos.',
-      keyDecisions: ['Conexión verificada exitosamente.'],
+      objectives: `Verificar la comunicación automática entre MinuteFlow y Google Drive para ${orgName}.`,
+      pointsTreated: `• Verificación de aislamiento multi-tenant.\n• Conexión establecida con la cuenta ${driveAccount}.\n• Estructura de carpetas y permisos corporativos operativos.`,
+      keyDecisions: ['Aislamiento y conexión verificados exitosamente.'],
       actionItems: [
         {
           id: 'act-test-1',
-          text: 'Comenzar a registrar actas reales en MinuteFlow',
+          text: `Comenzar a registrar actas institucionales en ${orgName}`,
           completed: false,
           priority: 'High',
           dueDate: new Date().toISOString().split('T')[0]
         }
       ],
       attendees: allAttendees.slice(0, 2),
-      folderPath: 'MinuteFlow / Pruebas',
-      lastEdited: 'Justo ahora'
+      folderPath: `${orgName} / Pruebas`,
+      lastEdited: 'Justo ahora',
+      organizationId: orgId
     };
 
     try {
-      const res = await syncMinuteToGoogleDrive(testMinute, userProfile.name);
+      const res = await syncMinuteToGoogleDrive(testMinute, userProfile.name, currentOrganization);
       setIsTestingDrive(false);
       onShowToast(res.message);
     } catch {
       setIsTestingDrive(false);
       onShowToast(`Prueba completada para ${driveAccount}`);
     }
-  };
-
-  const handleSaveGeneral = () => {
-    onShowToast('Configuración general y parámetros sincronizados.');
   };
 
   const filteredAttendees = allAttendees.filter(
@@ -281,12 +363,285 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50 custom-scrollbar">
       <div className="max-w-4xl mx-auto pb-24 space-y-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">
-            Configuración y Directorio
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Personaliza tu identidad ejecutiva, sincronización con Google Drive ({driveAccount}) y directorio de miembros.
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">
+                Configuración y Directorio
+              </h1>
+              <p className="text-sm text-slate-500 mt-1">
+                Gestión del espacio institucional de <strong>{orgName}</strong>, parámetros de Google Drive y directorio de miembros.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-bold px-3 py-1.5 rounded-xl border flex items-center gap-1.5 ${
+                isAdmin ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200'
+              }`}>
+                <span className="material-symbols-outlined text-[16px]">
+                  {isAdmin ? 'verified_user' : 'visibility'}
+                </span>
+                <span>Rol: {isAdmin ? 'Administrador' : userRole === 'editor' ? 'Editor' : 'Lector'}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Organization / Establishment Information Card */}
+        <div className="bento-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                <span className="material-symbols-outlined text-[22px]">domain</span>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <span>Datos del Establecimiento / Empresa</span>
+                  <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full font-bold">
+                    ID: {currentOrganization?.code || orgId}
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Espacio privado aislado. Ningún otro establecimiento tiene acceso a esta información.
+                </p>
+              </div>
+            </div>
+
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setIsEditingOrg(!isEditingOrg)}
+                className="text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl font-bold transition-colors cursor-pointer flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-[16px]">{isEditingOrg ? 'close' : 'edit'}</span>
+                <span>{isEditingOrg ? 'Cancelar' : 'Editar Institución'}</span>
+              </button>
+            )}
+          </div>
+
+          {isEditingOrg ? (
+            <form onSubmit={handleSaveOrgMetadata} className="space-y-4 pt-1">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Nombre de la Institución</label>
+                  <input
+                    type="text"
+                    value={orgDisplayName}
+                    onChange={(e) => setOrgDisplayName(e.target.value)}
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">RUT o Identificador Fiscal</label>
+                  <input
+                    type="text"
+                    value={orgTaxId}
+                    onChange={(e) => setOrgTaxId(e.target.value)}
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Dominio Corporativo / Web</label>
+                  <input
+                    type="text"
+                    value={orgDomain}
+                    onChange={(e) => setOrgDomain(e.target.value)}
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingOrg(false)}
+                  className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs"
+                >
+                  Guardar Datos del Establecimiento
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Establecimiento</span>
+                <span className="text-xs font-bold text-slate-900 block truncate">{orgName}</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">RUT / Identificador</span>
+                <span className="text-xs font-bold text-slate-800 block">{currentOrganization?.taxId || 'No asignado'}</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Dominio Autorizado</span>
+                <span className="text-xs font-bold text-indigo-700 block">@{currentOrganization?.domain || 'redq.cl'}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Google Drive Configuration Card (Per-Establishment Isolation) */}
+        <div className="bento-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                <span className="material-symbols-outlined text-[22px]">add_to_drive</span>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <span>Google Drive Exclusivo de este Establecimiento</span>
+                  {isAdmin ? (
+                    <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full">
+                      Control Administrador
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[13px]">lock</span>
+                      Solo Lectura
+                    </span>
+                  )}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Cada administrador ingresa su propia cuenta y URL de Webhook para archivar actas en su Drive institucional.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowDriveGuide(!showDriveGuide)}
+              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl cursor-pointer flex items-center gap-1 self-start sm:self-auto"
+            >
+              <span className="material-symbols-outlined text-[16px]">help</span>
+              <span>{showDriveGuide ? 'Ocultar Guía' : 'Guía de Conexión'}</span>
+            </button>
+          </div>
+
+          {/* Security Banner if user is not admin */}
+          {!isAdmin && (
+            <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl flex items-start gap-2.5 text-xs text-amber-900">
+              <span className="material-symbols-outlined text-amber-600 text-[20px] shrink-0 mt-0.5">lock</span>
+              <div>
+                <span className="font-bold block">Acceso Restringido por Política de Seguridad Multi-Tenant:</span>
+                Solo los Administradores de <strong>{orgName}</strong> tienen autorización para modificar la cuenta y URL de Google Drive. Esta barrera protege contra cualquier intento de desvío o filtración de información entre instituciones.
+              </div>
+            </div>
+          )}
+
+          {/* Guide Collapsible */}
+          {showDriveGuide && (
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2 animate-in fade-in">
+              <h5 className="font-bold text-slate-900 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[17px] text-indigo-600">checklist</span>
+                Instrucciones para el Administrador de {orgName}:
+              </h5>
+              <ol className="list-decimal list-inside space-y-1.5 text-slate-600 text-[11px] leading-relaxed">
+                <li>Inicia sesión en <a href="https://script.google.com" target="_blank" rel="noreferrer" className="text-indigo-600 font-bold underline">script.google.com</a> con la cuenta institucional de tu colegio o empresa (ej: <strong>{driveAccount}</strong>).</li>
+                <li>Crea un <strong>Nuevo Proyecto</strong> y pega el código de <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-bold text-indigo-700">google-apps-script/Code.gs</code>.</li>
+                <li>Haz clic en <strong>Implementar &gt; Nueva implementación &gt; Aplicación web</strong>.</li>
+                <li>Configura: <em>Ejecutar como: &quot;Yo ({driveAccount})&quot;</em> y <em>Quién tiene acceso: &quot;Cualquier usuario&quot;</em>.</li>
+                <li>Copia la URL que termina en <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono text-slate-800">/exec</code> y pégala en el campo de abajo.</li>
+              </ol>
+            </div>
+          )}
+
+          {/* Form to configure Webhook & Target Account */}
+          <form onSubmit={handleSaveDriveConfig} className="space-y-3.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              <div>
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  Cuenta Google Drive Institucional (Dueño del Drive)
+                </label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-[18px]">
+                    account_circle
+                  </span>
+                  <input
+                    type="email"
+                    value={driveAccount}
+                    onChange={(e) => setDriveAccountState(e.target.value)}
+                    disabled={!isAdmin}
+                    placeholder="ej. rectoria@colegio.cl o admin@empresa.com"
+                    className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium disabled:opacity-75 disabled:cursor-not-allowed"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1 flex items-center justify-between">
+                  <span>URL del Webhook Google Apps Script (/exec)</span>
+                  <span className="text-[10px] text-emerald-600 font-bold">HTTPS Obligatorio</span>
+                </label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-[18px]">
+                    link
+                  </span>
+                  <input
+                    type="url"
+                    value={driveWebhookUrl}
+                    onChange={(e) => {
+                      setDriveWebhookUrlState(e.target.value);
+                      setDriveUrlError(null);
+                    }}
+                    disabled={!isAdmin}
+                    placeholder="https://script.google.com/macros/s/.../exec"
+                    className={`w-full pl-9 pr-3 py-2 text-xs rounded-xl border font-mono ${
+                      driveUrlError
+                        ? 'border-rose-400 bg-rose-50 text-rose-900 focus:ring-rose-200'
+                        : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-indigo-100'
+                    } focus:outline-none focus:ring-2 font-medium disabled:opacity-75 disabled:cursor-not-allowed`}
+                  />
+                </div>
+                {driveUrlError && (
+                  <p className="text-[10px] text-rose-600 font-bold mt-1 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px]">error</span>
+                    {driveUrlError}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="material-symbols-outlined text-indigo-600 text-[20px] shrink-0">folder</span>
+                <p className="text-[11px] text-indigo-900 truncate">
+                  Carpeta en Drive: <strong>MinuteFlow - Actas Ejecutivas / {orgName}</strong>
+                </p>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span>Cifrado Activo</span>
+              </div>
+            </div>
+
+            {isAdmin && (
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={handleTestDriveConnection}
+                  disabled={isTestingDrive}
+                  className="px-3.5 py-2 text-xs font-bold text-indigo-700 bg-white border border-indigo-200 hover:bg-indigo-50 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 shadow-2xs"
+                >
+                  <span className={`material-symbols-outlined text-[16px] ${isTestingDrive ? 'animate-spin' : ''}`}>
+                    {isTestingDrive ? 'progress_activity' : 'send'}
+                  </span>
+                  <span>{isTestingDrive ? 'Probando Conexión...' : 'Probar Envío a este Drive'}</span>
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">save</span>
+                  <span>Guardar Parámetros de Drive</span>
+                </button>
+              </div>
+            )}
+          </form>
         </div>
 
         {/* Profile Card / Editor */}
@@ -294,7 +649,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span className="material-symbols-outlined text-indigo-600">person</span>
-              Perfil del Usuario Ejecutivo
+              Perfil del Usuario Activo
             </h3>
             <button
               onClick={() => setIsEditingProfile(!isEditingProfile)}
@@ -400,7 +755,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                   <h4 className="text-base font-bold text-slate-900">{userProfile.name}</h4>
                   <span className="text-[11px] font-semibold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full inline-block self-center sm:self-auto">
-                    {userProfile.plan}
+                    {userProfile.plan || 'Plan Activo'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 font-medium">
@@ -412,39 +767,41 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           )}
         </div>
 
-        {/* Directory Management Card */}
+        {/* Directory Management Card (Scoped to Organization) */}
         <div className="bento-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span className="material-symbols-outlined text-indigo-600">groups</span>
-                Directorio Corporativo de Miembros
+                Directorio Institucional de {orgName}
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                {allAttendees.length} miembros registrados. Puedes editarlos o eliminarlos según las necesidades de tu organización.
+                {allAttendees.length} miembros registrados en este establecimiento.
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              {onResetContacts && (
+            {isAdmin && (
+              <div className="flex items-center gap-2">
+                {onResetContacts && (
+                  <button
+                    type="button"
+                    onClick={onResetContacts}
+                    className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 font-semibold px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1"
+                    title="Restablecer miembros por defecto de este establecimiento"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                    <span className="hidden sm:inline">Restablecer</span>
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={onResetContacts}
-                  className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 font-semibold px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1"
-                  title="Restablecer a los miembros iniciales por defecto"
+                  onClick={() => setIsAddingContact(true)}
+                  className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3.5 py-1.5 rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[16px]">restart_alt</span>
-                  <span className="hidden sm:inline">Restablecer</span>
+                  <span className="material-symbols-outlined text-[16px]">person_add</span>
+                  <span>Nuevo Miembro</span>
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setIsAddingContact(true)}
-                className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3.5 py-1.5 rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">person_add</span>
-                <span>Nuevo Miembro</span>
-              </button>
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Search Bar */}
@@ -456,18 +813,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               type="text"
               value={directorySearch}
               onChange={(e) => setDirectorySearch(e.target.value)}
-              placeholder="Buscar por nombre, cargo o correo..."
+              placeholder="Buscar por nombre, cargo o correo en este establecimiento..."
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 font-medium"
             />
           </div>
 
           {/* Add Contact Form */}
-          {isAddingContact && (
+          {isAddingContact && isAdmin && (
             <form onSubmit={handleCreateContactSubmit} className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-100 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[18px]">person_add</span>
-                  Agregar Nuevo Miembro al Directorio
+                  Agregar Nuevo Miembro a {orgName}
                 </span>
                 <button
                   type="button"
@@ -498,7 +855,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   type="email"
                   value={contactEmail}
                   onChange={(e) => setContactEmail(e.target.value)}
-                  placeholder="Correo electrónico"
+                  placeholder="Correo institucional"
                   className="text-xs px-3 py-2 rounded-xl border border-indigo-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
                 />
               </div>
@@ -541,126 +898,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => startEditContact(att)}
-                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-                    title="Editar miembro"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">edit</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setContactToDelete(att)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                    title="Eliminar miembro"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">delete</span>
-                  </button>
-                </div>
+                {isAdmin && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => startEditContact(att)}
+                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                      title="Editar miembro"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">edit</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setContactToDelete(att)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                      title="Eliminar miembro"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* Connected Channels & Google Drive Sync */}
-        <div className="bento-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
-          <h3 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
-            <span className="material-symbols-outlined text-indigo-600">cloud_sync</span>
-            Canales de Sincronización y Google Drive
-          </h3>
-
-          <div className="space-y-4">
-            {/* Google Drive Card */}
-            <div className="p-4 rounded-2xl bg-indigo-50/40 border border-indigo-100 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
-                    <span className="material-symbols-outlined text-[22px]">add_to_drive</span>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900">Google Drive Corporativo</h4>
-                    <p className="text-[11px] text-indigo-700 font-medium">
-                      Cuenta asignada: <strong>{driveAccount}</strong>
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setShowDriveGuide(!showDriveGuide)}
-                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 px-3 py-1.5 rounded-xl cursor-pointer flex items-center gap-1 shadow-2xs"
-                >
-                  <span className="material-symbols-outlined text-[16px]">help</span>
-                  <span>{showDriveGuide ? 'Ocultar Guía' : 'Ver Guía de Conexión'}</span>
-                </button>
-              </div>
-
-              {/* Guide Collapsible */}
-              {showDriveGuide && (
-                <div className="p-4 bg-white rounded-xl border border-indigo-100 text-xs space-y-2 animate-in fade-in">
-                  <h5 className="font-bold text-slate-900">Cómo conectar tu Google Drive ({driveAccount}):</h5>
-                  <ol className="list-decimal list-inside space-y-1 text-slate-600 text-[11px] leading-relaxed">
-                    <li>Ingresa a <a href="https://script.google.com" target="_blank" rel="noreferrer" className="text-indigo-600 font-bold underline">script.google.com</a> con tu cuenta <strong>{driveAccount}</strong>.</li>
-                    <li>Crea un <strong>Nuevo Proyecto</strong> y pega el código de <code className="bg-slate-100 px-1 py-0.5 rounded font-bold">google-apps-script/Code.gs</code>.</li>
-                    <li>Haz clic en <strong>Implementar &gt; Nueva implementación &gt; Aplicación web</strong>.</li>
-                    <li>En &quot;Quién tiene acceso&quot; selecciona <strong>Cualquier usuario</strong> y haz clic en Implementar.</li>
-                    <li>Copia la URL que termina en <code className="bg-slate-100 px-1 py-0.5 rounded">/exec</code> y pégala abajo.</li>
-                  </ol>
-                </div>
-              )}
-
-              {/* Form to configure Webhook & Target Account */}
-              <form onSubmit={handleSaveDriveConfig} className="space-y-3 pt-1">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                      Cuenta Google Drive de Destino
-                    </label>
-                    <input
-                      type="email"
-                      value={driveAccount}
-                      onChange={(e) => setDriveAccountState(e.target.value)}
-                      placeholder="jose.cataldo@redq.cl"
-                      className="w-full text-xs px-3 py-2 rounded-xl border border-indigo-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                      URL del Webhook Google Apps Script (/exec)
-                    </label>
-                    <input
-                      type="url"
-                      value={driveWebhookUrl}
-                      onChange={(e) => setDriveWebhookUrlState(e.target.value)}
-                      placeholder="https://script.google.com/macros/s/.../exec"
-                      className="w-full text-xs px-3 py-2 rounded-xl border border-indigo-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 font-medium"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleTestDriveConnection}
-                    disabled={isTestingDrive}
-                    className="px-3.5 py-1.5 text-xs font-bold text-indigo-700 bg-white border border-indigo-200 hover:bg-indigo-50 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-                  >
-                    <span className={`material-symbols-outlined text-[16px] ${isTestingDrive ? 'animate-spin' : ''}`}>
-                      {isTestingDrive ? 'progress_activity' : 'send'}
-                    </span>
-                    <span>{isTestingDrive ? 'Probando...' : 'Probar Envío a Drive'}</span>
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-all cursor-pointer"
-                  >
-                    Guardar Parámetros de Drive
-                  </button>
-                </div>
-              </form>
-            </div>
           </div>
         </div>
 
@@ -670,41 +929,43 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div>
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span className="material-symbols-outlined text-indigo-600">folder_special</span>
-                Estructura Organizacional de Carpetas
+                Estructura de Carpetas de {orgName}
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Crea, renombra o elimina carpetas para clasificar tus actas de reunión.
+                Clasifica las actas exclusivas de tu establecimiento.
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              {onResetDirectories && (
+            {isAdmin && (
+              <div className="flex items-center gap-2">
+                {onResetDirectories && (
+                  <button
+                    type="button"
+                    onClick={onResetDirectories}
+                    className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 font-semibold px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                    <span className="hidden sm:inline">Restablecer</span>
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={onResetDirectories}
-                  className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 font-semibold px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1"
+                  onClick={() => setIsAddingFolder(true)}
+                  className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3.5 py-1.5 rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[16px]">restart_alt</span>
-                  <span className="hidden sm:inline">Restablecer</span>
+                  <span className="material-symbols-outlined text-[16px]">add</span>
+                  <span>Nueva Carpeta</span>
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setIsAddingFolder(true)}
-                className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3.5 py-1.5 rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">add</span>
-                <span>Nueva Carpeta</span>
-              </button>
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Add Folder Inline Form */}
-          {isAddingFolder && (
+          {isAddingFolder && isAdmin && (
             <form onSubmit={handleCreateFolderSubmit} className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-100 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[18px]">create_new_folder</span>
-                  Crear Nueva Carpeta
+                  Crear Nueva Carpeta en {orgName}
                 </span>
                 <button
                   type="button"
@@ -719,7 +980,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   type="text"
                   value={newFolderName}
                   onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder="ej. Auditoría Externa 2026, Comités Técnicos..."
+                  placeholder="ej. Consejos Académicos 2026, Auditoría de Finanzas..."
                   autoFocus
                   className="flex-1 text-xs px-3.5 py-2 rounded-xl border border-indigo-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-600 font-medium"
                 />
@@ -749,110 +1010,114 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <div className="min-w-0">
                     <h4 className="text-xs font-bold text-slate-900 truncate">{dir.name}</h4>
                     <p className="text-[10px] text-slate-400 font-medium">
-                      ID: {dir.id}
+                      Establecimiento: {orgName}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingFolder(dir);
-                      setEditFolderName(dir.name);
-                    }}
-                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-                    title="Renombrar carpeta"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">edit</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFolderToDelete(dir)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                    title="Eliminar carpeta"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">delete</span>
-                  </button>
-                </div>
+                {isAdmin && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingFolder(dir);
+                        setEditFolderName(dir.name);
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                      title="Renombrar carpeta"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">edit</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFolderToDelete(dir)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                      title="Eliminar carpeta"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         </div>
 
         {/* Minutes & Sample Data Management */}
-        <div className="bento-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
-          <div className="border-b border-slate-100 pb-3">
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <span className="material-symbols-outlined text-indigo-600">database</span>
-              Gestión de Datos y Actas de Reunión
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Controla las actas almacenadas localmente, elimina los registros de muestra o restablece el estado inicial.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70 flex flex-col justify-between gap-3">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                  Actas de Muestra
-                </span>
-                <p className="text-xs text-slate-600 font-medium">
-                  Elimina las actas precargadas de ejemplo para comenzar con tu propia biblioteca limpia.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowDeleteSampleDialog(true)}
-                className="w-full text-xs font-semibold text-rose-600 bg-white border border-rose-200 hover:bg-rose-50 py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-[16px]">delete_sweep</span>
-                <span>Eliminar Actas de Ejemplo</span>
-              </button>
+        {isAdmin && (
+          <div className="bento-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
+            <div className="border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <span className="material-symbols-outlined text-indigo-600">database</span>
+                Gestión de Datos de este Establecimiento
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Controla las actas almacenadas para <strong>{orgName}</strong>.
+              </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70 flex flex-col justify-between gap-3">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                  Restablecer Muestras
-                </span>
-                <p className="text-xs text-slate-600 font-medium">
-                  Restaura el set de actas ejecutivas y directorios de demostración preconfigurados.
-                </p>
-              </div>
-              {onResetSampleMinutes && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70 flex flex-col justify-between gap-3">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                    Actas de Muestra
+                  </span>
+                  <p className="text-xs text-slate-600 font-medium">
+                    Elimina las actas precargadas de ejemplo para este establecimiento.
+                  </p>
+                </div>
                 <button
                   type="button"
-                  onClick={onResetSampleMinutes}
-                  className="w-full text-xs font-semibold text-indigo-600 bg-white border border-indigo-200 hover:bg-indigo-50 py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  onClick={() => setShowDeleteSampleDialog(true)}
+                  className="w-full text-xs font-semibold text-rose-600 bg-white border border-rose-200 hover:bg-rose-50 py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  <span className="material-symbols-outlined text-[16px]">restart_alt</span>
-                  <span>Restaurar Ejemplos</span>
+                  <span className="material-symbols-outlined text-[16px]">delete_sweep</span>
+                  <span>Eliminar Actas de Ejemplo</span>
                 </button>
-              )}
-            </div>
-
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70 flex flex-col justify-between gap-3">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                  Limpieza Total ({minutesCount} Actas)
-                </span>
-                <p className="text-xs text-slate-600 font-medium">
-                  Borra permanentemente todas las actas registradas en la aplicación.
-                </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowClearAllDialog(true)}
-                className="w-full text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 py-2 rounded-xl transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-[16px]">delete_forever</span>
-                <span>Vaciar Todo</span>
-              </button>
+
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70 flex flex-col justify-between gap-3">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                    Restablecer Muestras
+                  </span>
+                  <p className="text-xs text-slate-600 font-medium">
+                    Restaura el set de actas de prueba configuradas para este establecimiento.
+                  </p>
+                </div>
+                {onResetSampleMinutes && (
+                  <button
+                    type="button"
+                    onClick={onResetSampleMinutes}
+                    className="w-full text-xs font-semibold text-indigo-600 bg-white border border-indigo-200 hover:bg-indigo-50 py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                    <span>Restaurar Ejemplos</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70 flex flex-col justify-between gap-3">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                    Limpieza Total ({minutesCount} Actas)
+                  </span>
+                  <p className="text-xs text-slate-600 font-medium">
+                    Borra permanentemente todas las actas registradas en {orgName}.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowClearAllDialog(true)}
+                  className="w-full text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 py-2 rounded-xl transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">delete_forever</span>
+                  <span>Vaciar Todo</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Edit Contact Modal */}
@@ -868,7 +1133,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900">Editar Miembro</h3>
-                <p className="text-xs text-slate-500">Actualiza los datos del asistente en el directorio.</p>
+                <p className="text-xs text-slate-500">Actualiza los datos del asistente para {orgName}.</p>
               </div>
             </div>
 
@@ -932,7 +1197,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="text-center">
               <h3 className="text-base font-bold text-slate-900">¿Eliminar miembro del directorio?</h3>
               <p className="text-xs text-slate-500 mt-1.5">
-                Se eliminará a &quot;<span className="font-semibold text-slate-700">{contactToDelete.name}</span>&quot;.
+                Se eliminará a &quot;<span className="font-semibold text-slate-700">{contactToDelete.name}</span>&quot; de {orgName}.
               </p>
             </div>
             <div className="flex gap-2.5 pt-2">
@@ -965,7 +1230,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="text-center">
               <h3 className="text-base font-bold text-slate-900">¿Eliminar actas de ejemplo precargadas?</h3>
               <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                Esta acción borrará las 7 actas de muestra predefinidas en el sistema para que puedas trabajar únicamente con tus propias actas.
+                Esta acción borrará las actas de muestra predefinidas en {orgName} para que puedas trabajar con una biblioteca limpia.
               </p>
             </div>
             <div className="flex gap-2.5 pt-2">
@@ -999,9 +1264,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <span className="material-symbols-outlined text-[28px]">warning</span>
             </div>
             <div className="text-center">
-              <h3 className="text-base font-bold text-slate-900">¿Vaciar toda la biblioteca de actas?</h3>
+              <h3 className="text-base font-bold text-slate-900">¿Vaciar toda la biblioteca de {orgName}?</h3>
               <p className="text-xs text-slate-500 mt-1.5">
-                Esta acción eliminará <span className="font-bold text-slate-900">todas</span> las actas registradas. No se podrá deshacer.
+                Esta acción eliminará <span className="font-bold text-slate-900">todas</span> las actas registradas para este establecimiento.
               </p>
             </div>
             <div className="flex gap-2.5 pt-2">

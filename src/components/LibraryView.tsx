@@ -15,6 +15,7 @@ interface LibraryViewProps {
   onDeleteSampleMinutes?: () => void;
   onClearAllMinutes?: () => void;
   onResetSampleMinutes?: () => void;
+  userRole?: 'superadmin' | 'admin' | 'editor' | 'reader';
 }
 
 export const LibraryView: React.FC<LibraryViewProps> = ({
@@ -30,8 +31,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onDeleteDirectory,
   onDeleteSampleMinutes,
   onClearAllMinutes,
-  onResetSampleMinutes
+  onResetSampleMinutes,
+  userRole = 'admin'
 }) => {
+  const canEdit = userRole === 'superadmin' || userRole === 'admin' || userRole === 'editor';
   const [selectedDirectory, setSelectedDirectory] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<MinuteStatus | 'All'>('All');
   const [viewFormat, setViewFormat] = useState<'card' | 'list'>('card');
@@ -128,43 +131,51 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Quick Actions for Sample Minutes & Folders */}
-            <button
-              onClick={() => setIsAddingFolder(true)}
-              className="text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 px-3.5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[18px] text-indigo-600">create_new_folder</span>
-              <span>Nueva Carpeta</span>
-            </button>
-
-            {minutes.length > 0 ? (
-              <button
-                onClick={() => setShowDeleteSampleModal(true)}
-                className="text-xs font-semibold text-rose-600 bg-rose-50/70 border border-rose-200/70 hover:bg-rose-100 hover:border-rose-300 px-3.5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                title="Eliminar actas precargadas de muestra"
-              >
-                <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
-                <span>Limpiar Actas de Ejemplo</span>
-              </button>
-            ) : (
-              onResetSampleMinutes && (
+            {canEdit ? (
+              <>
                 <button
-                  onClick={onResetSampleMinutes}
-                  className="text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 px-3.5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                  onClick={() => setIsAddingFolder(true)}
+                  className="text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 px-3.5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[18px]">restart_alt</span>
-                  <span>Cargar Actas de Ejemplo</span>
+                  <span className="material-symbols-outlined text-[18px] text-indigo-600">create_new_folder</span>
+                  <span>Nueva Carpeta</span>
                 </button>
-              )
-            )}
 
-            <button
-              onClick={onNewMinute}
-              className="text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-100 flex items-center gap-2 cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[18px]">add</span>
-              <span>Nueva Acta</span>
-            </button>
+                {minutes.length > 0 ? (
+                  <button
+                    onClick={() => setShowDeleteSampleModal(true)}
+                    className="text-xs font-semibold text-rose-600 bg-rose-50/70 border border-rose-200/70 hover:bg-rose-100 hover:border-rose-300 px-3.5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                    title="Eliminar actas precargadas de muestra"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
+                    <span>Limpiar Actas de Ejemplo</span>
+                  </button>
+                ) : (
+                  onResetSampleMinutes && (
+                    <button
+                      onClick={onResetSampleMinutes}
+                      className="text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 px-3.5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">restart_alt</span>
+                      <span>Cargar Actas de Ejemplo</span>
+                    </button>
+                  )
+                )}
+
+                <button
+                  onClick={onNewMinute}
+                  className="text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-100 flex items-center gap-2 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add</span>
+                  <span>Nueva Acta</span>
+                </button>
+              </>
+            ) : (
+              <span className="text-xs font-bold px-3 py-2 rounded-xl bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px]">visibility</span>
+                <span>Modo Solo Lectura (Lector)</span>
+              </span>
+            )}
 
             <div className="flex bg-slate-100 rounded-xl p-1 border border-slate-200">
               <button

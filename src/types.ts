@@ -8,22 +8,41 @@ export type MinuteStatus =
   | 'Pending Sig'
   | 'Finished';
 
+export type UserRole = 'superadmin' | 'admin' | 'editor' | 'reader';
+
+export interface Organization {
+  id: string;
+  name: string;
+  code: string;
+  taxId?: string; // RUT o NIT del establecimiento/empresa
+  domain?: string;
+  driveAccount?: string;
+  driveWebhookUrl?: string;
+  logoUrl?: string;
+  plan?: string;
+  createdAt?: string;
+}
+
 export interface Attendee {
   id: string;
   name: string;
   role?: string;
   email: string;
   avatarUrl: string;
+  organizationId?: string;
 }
 
 export interface UserProfile {
   id: string;
   name: string;
   role: string;
+  systemRole?: UserRole;
   email: string;
   department?: string;
   avatarUrl: string;
   plan?: string;
+  organizationId: string;
+  organizationName?: string;
 }
 
 export interface ActionItem {
@@ -36,6 +55,7 @@ export interface ActionItem {
   priority?: 'Low' | 'Medium' | 'High';
   sourceMinuteTitle?: string;
   sourceMinuteId?: string;
+  organizationId?: string;
 }
 
 export interface MeetingMinute {
@@ -56,6 +76,7 @@ export interface MeetingMinute {
   syncCalendar?: boolean;
   folderPath?: string;
   lastEdited?: string;
+  organizationId?: string;
 }
 
 export interface ScheduleItem {
@@ -67,6 +88,7 @@ export interface ScheduleItem {
   platform: string;
   link?: string;
   date?: string;
+  organizationId?: string;
 }
 
 export interface DirectoryItem {
@@ -74,6 +96,7 @@ export interface DirectoryItem {
   name: string;
   count: number;
   icon?: string;
+  organizationId?: string;
 }
 
 export type ViewMode = 'dashboard' | 'library' | 'editor' | 'projects' | 'settings';

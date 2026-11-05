@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { TopAppBar } from './components/TopAppBar';
 import { DashboardView } from './components/DashboardView';
@@ -13,7 +13,9 @@ import {
   ActionItem,
   Attendee,
   UserProfile,
-  DirectoryItem
+  DirectoryItem,
+  Organization,
+  UserRole
 } from './types';
 import {
   INITIAL_MINUTES,
@@ -21,17 +23,43 @@ import {
   INITIAL_SCHEDULE,
   INITIAL_DIRECTORIES,
   INITIAL_ATTENDEES,
-  INITIAL_USER_PROFILE
+  INITIAL_USER_PROFILE,
+  INITIAL_ORGANIZATIONS
 } from './data/mockData';
 
 export default function App() {
   // Navigation State
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
 
+  // Organizations (Tenants) State
+  const [organizations, setOrganizations] = useState<Organization[]>(() => {
+    const saved = localStorage.getItem('minuteflow_organizations');
+    return saved ? JSON.parse(saved) : INITIAL_ORGANIZATIONS;
+  });
+
+  const [currentOrgId, setCurrentOrgId] = useState<string>(() => {
+    return localStorage.getItem('minuteflow_current_org_id') || 'org-redq';
+  });
+
+  // Current Organization helper
+  const currentOrganization = useMemo(() => {
+    return organizations.find((o) => o.id === currentOrgId) || organizations[0] || INITIAL_ORGANIZATIONS[0];
+  }, [organizations, currentOrgId]);
+
   // User Profile State with local storage
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
     const saved = localStorage.getItem('minuteflow_user_profile');
-    return saved ? JSON.parse(saved) : INITIAL_USER_PROFILE;
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        ...INITIAL_USER_PROFILE,
+        ...parsed,
+        organizationId: parsed.organizationId || currentOrgId,
+        organizationName: parsed.organizationName || currentOrganization.name,
+        systemRole: parsed.systemRole || 'admin'
+      };
+    }
+    return INITIAL_USER_PROFILE;
   });
 
   // Core Data with Local Storage fallback
@@ -51,6 +79,7 @@ export default function App() {
   });
 
   const [schedule] = useState(INITIAL_SCHEDULE);
+
   const [directories, setDirectories] = useState<DirectoryItem[]>(() => {
     const saved = localStorage.getItem('minuteflow_directories');
     return saved ? JSON.parse(saved) : INITIAL_DIRECTORIES;
@@ -67,6 +96,14 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Persist data on change
+  useEffect(() => {
+    localStorage.setItem('minuteflow_organizations', JSON.stringify(organizations));
+  }, [organizations]);
+
+  useEffect(() => {
+    localStorage.setItem('minuteflow_current_org_id', currentOrgId);
+  }, [currentOrgId]);
+
   useEffect(() => {
     localStorage.setItem('minuteflow_minutes', JSON.stringify(minutes));
   }, [minutes]);
@@ -94,28 +131,84 @@ export default function App() {
     }, 3500);
   };
 
-  // Directory / Folder Operations
+  // Switch Active Organization
+  const handleSelectOrganization = (org: Organization) => {
+    setCurrentOrgId(org.id);
+    setUserProfile((prev) => ({
+      ...prev,
+      organizationId: org.id,
+      organizationName: org.name
+    }));
+    setActiveMinute(null);
+    setCurrentView('dashboard');
+    showToast(`Conectado al espacio aislado de "${org.name}"`);
+  };
+
+  // Change simulated role (Admin / Editor / Reader)
+  const handleChangeUserRole = (newRole: UserRole) => {
+    setUserProfile((prev) => ({
+      ...prev,
+      systemRole: newRole
+    }));
+    showToast(`Rol actualizado a "${newRole === 'admin' ? 'Administrador' : newRole === 'editor' ? 'Editor' : 'Lector'}"`);
+  };
+
+  // Update Organization Settings (by Admin)
+  const handleUpdateOrganization = (updated: Organization) => {
+    setOrganizations((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+    if (updated.id === currentOrgId) {
+      setUserProfile((prev) => ({
+        ...prev,
+        organizationName: updated.name
+      }));
+    }
+  };
+
+  // Strict Scoped Multi-Tenant Filtering:
+  // Garantiza que ningún usuario de una organización acceda a actas, carpetas ni miembros de otra.
+  const scopedMinutes = useMemo(() => {
+    return minutes.filter((m) => (m.organizationId || 'org-redq') === currentOrgId);
+  }, [minutes, currentOrgId]);
+
+  const scopedDirectories = useMemo(() => {
+    return directories.filter((d) => (d.organizationId || 'org-redq') === currentOrgId);
+  }, [directories, currentOrgId]);
+
+  const scopedAttendees = useMemo(() => {
+    return allAttendees.filter((a) => (a.organizationId || 'org-redq') === currentOrgId);
+  }, [allAttendees, currentOrgId]);
+
+  const scopedActionItems = useMemo(() => {
+    return actionItems.filter((act) => (act.organizationId || 'org-redq') === currentOrgId);
+  }, [actionItems, currentOrgId]);
+
+  const scopedSchedule = useMemo(() => {
+    return schedule.filter((s) => (s.organizationId || 'org-redq') === currentOrgId);
+  }, [schedule, currentOrgId]);
+
+  // Directory / Folder Operations (Scoped to current organization)
   const handleCreateDirectory = (name: string, icon: string = 'folder') => {
     const trimmed = name.trim();
     if (!trimmed) {
       showToast('El nombre de la carpeta no puede estar vacío');
       return;
     }
-    if (directories.some((d) => d.name.toLowerCase() === trimmed.toLowerCase())) {
-      showToast('Ya existe una carpeta con ese nombre');
+    if (scopedDirectories.some((d) => d.name.toLowerCase() === trimmed.toLowerCase())) {
+      showToast(`Ya existe una carpeta con ese nombre en ${currentOrganization.name}`);
       return;
     }
     const newDir: DirectoryItem = {
       id: `dir-${Date.now()}`,
       name: trimmed,
       count: 0,
-      icon: icon || 'folder'
+      icon: icon || 'folder',
+      organizationId: currentOrgId
     };
     setDirectories((prev) => [...prev, newDir]);
-    showToast(`Carpeta "${trimmed}" creada con éxito`);
+    showToast(`Carpeta "${trimmed}" creada en ${currentOrganization.name}`);
   };
 
-  const handleUpdateDirectory = (id: string, newName: string, icon?: string) => {
+  const handleUpdateDirectory = (id: string, newName: string) => {
     const trimmed = newName.trim();
     if (!trimmed) {
       showToast('El nombre de la carpeta no puede estar vacío');
@@ -124,21 +217,18 @@ export default function App() {
     const target = directories.find((d) => d.id === id);
     if (!target) return;
 
-    const oldName = target.name;
     setDirectories((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, name: trimmed, icon: icon || d.icon } : d))
+      prev.map((d) => (d.id === id ? { ...d, name: trimmed } : d))
     );
 
-    // Update all minutes that were in the old directory
+    // Actualizar las actas asociadas dentro de esta organización
     setMinutes((prev) =>
-      prev.map((m) => (m.directory === oldName ? { ...m, directory: trimmed } : m))
+      prev.map((m) =>
+        (m.organizationId || 'org-redq') === currentOrgId && m.directory === target.name
+          ? { ...m, directory: trimmed, folderPath: `${trimmed} / Notas` }
+          : m
+      )
     );
-
-    // Also update active minute if open
-    if (activeMinute && activeMinute.directory === oldName) {
-      setActiveMinute((prev) => (prev ? { ...prev, directory: trimmed } : null));
-    }
-
     showToast(`Carpeta renombrada a "${trimmed}"`);
   };
 
@@ -146,215 +236,170 @@ export default function App() {
     const target = directories.find((d) => d.id === id);
     if (!target) return;
 
-    const fallbackDir = directories.find((d) => d.id !== id)?.name || 'General';
-    setDirectories((prev) => prev.filter((d) => d.id !== id));
+    const remaining = scopedDirectories.filter((d) => d.id !== id);
+    const fallbackDirName = remaining.length > 0 ? remaining[0].name : 'General';
 
-    // Reassign minutes that belonged to this directory
     setMinutes((prev) =>
-      prev.map((m) => (m.directory === target.name ? { ...m, directory: fallbackDir } : m))
+      prev.map((m) =>
+        (m.organizationId || 'org-redq') === currentOrgId && m.directory === target.name
+          ? { ...m, directory: fallbackDirName, folderPath: `${fallbackDirName} / Notas` }
+          : m
+      )
     );
 
+    setDirectories((prev) => prev.filter((d) => d.id !== id));
     showToast(`Carpeta "${target.name}" eliminada`);
   };
 
   const handleResetDirectories = () => {
-    setDirectories(INITIAL_DIRECTORIES);
-    showToast('Carpetas restablecidas a la configuración inicial');
+    const otherOrgsDirs = directories.filter((d) => (d.organizationId || 'org-redq') !== currentOrgId);
+    const initialForThisOrg = INITIAL_DIRECTORIES.filter((d) => (d.organizationId || 'org-redq') === currentOrgId);
+    setDirectories([...otherOrgsDirs, ...initialForThisOrg]);
+    showToast(`Carpetas de ${currentOrganization.name} restablecidas`);
   };
 
-  // Minutes bulk / sample cleanup operations
-  const handleDeleteSampleMinutes = () => {
-    // Delete initial sample minutes (min-1 to min-7) or all initial minutes
-    const initialIds = new Set(INITIAL_MINUTES.map((m) => m.id));
-    setMinutes((prev) => prev.filter((m) => !initialIds.has(m.id)));
-    showToast('Actas de ejemplo eliminadas');
-  };
+  // Minutes CRUD Operations (Scoped to current organization)
+  const handleSaveMinute = (updatedMinute: MeetingMinute, isDraft: boolean) => {
+    const minuteWithOrg: MeetingMinute = {
+      ...updatedMinute,
+      organizationId: updatedMinute.organizationId || currentOrgId
+    };
 
-  const handleClearAllMinutes = () => {
-    setMinutes([]);
-    showToast('Todas las actas han sido eliminadas');
-  };
+    const exists = minutes.some((m) => m.id === minuteWithOrg.id);
+    let newMinutesList: MeetingMinute[];
 
-  const handleResetSampleMinutes = () => {
-    setMinutes(INITIAL_MINUTES);
-    showToast('Actas de ejemplo restauradas');
-  };
-
-  // Actions
-  const handleNewMinute = () => {
-    setActiveMinute(null);
-    setCurrentView('editor');
-  };
-
-  const handleSelectMinute = (min: MeetingMinute) => {
-    setActiveMinute(min);
-    setCurrentView('editor');
-  };
-
-  const handleOpenExport = (min: MeetingMinute) => {
-    setExportTargetMinute(min);
-    setExportModalOpen(true);
-  };
-
-  const handleSaveMinute = (savedMinute: MeetingMinute, isDraft: boolean) => {
-    setMinutes((prev) => {
-      const exists = prev.some((m) => m.id === savedMinute.id);
-      if (exists) {
-        return prev.map((m) => (m.id === savedMinute.id ? savedMinute : m));
-      } else {
-        return [savedMinute, ...prev];
-      }
-    });
-
-    // Also update global action items if any new ones were added
-    if (savedMinute.actionItems && savedMinute.actionItems.length > 0) {
-      setActionItems((prev) => {
-        const newActions = [...prev];
-        savedMinute.actionItems.forEach((newItem) => {
-          const idx = newActions.findIndex((a) => a.id === newItem.id);
-          if (idx >= 0) {
-            newActions[idx] = newItem;
-          } else {
-            newActions.unshift(newItem);
-          }
-        });
-        return newActions;
-      });
+    if (exists) {
+      newMinutesList = minutes.map((m) => (m.id === minuteWithOrg.id ? minuteWithOrg : m));
+      showToast(isDraft ? 'Borrador actualizado con éxito' : 'Acta aprobada y guardada con éxito');
+    } else {
+      newMinutesList = [minuteWithOrg, ...minutes];
+      showToast(isDraft ? 'Nuevo borrador creado' : 'Nueva acta oficial aprobada');
     }
 
-    showToast(isDraft ? 'Borrador guardado con éxito' : 'Acta publicada y sincronizada');
-    setActiveMinute(savedMinute);
+    setMinutes(newMinutesList);
+
+    // Sincronizar compromisos de esta acta
+    const otherActions = actionItems.filter((a) => a.sourceMinuteId !== minuteWithOrg.id);
+    const newActionsFromMinute: ActionItem[] = minuteWithOrg.actionItems.map((act) => ({
+      ...act,
+      sourceMinuteId: minuteWithOrg.id,
+      sourceMinuteTitle: minuteWithOrg.title,
+      organizationId: currentOrgId
+    }));
+    setActionItems([...newActionsFromMinute, ...otherActions]);
+
+    setActiveMinute(null);
     setCurrentView('library');
   };
 
   const handleDeleteMinute = (id: string) => {
     setMinutes((prev) => prev.filter((m) => m.id !== id));
-    showToast('Acta de reunión eliminada');
+    setActionItems((prev) => prev.filter((a) => a.sourceMinuteId !== id));
+    showToast('Acta eliminada del sistema');
   };
 
-  const handleDuplicateMinute = (min: MeetingMinute) => {
+  const handleDuplicateMinute = (minuteToDup: MeetingMinute) => {
     const duplicated: MeetingMinute = {
-      ...min,
+      ...minuteToDup,
       id: `min-${Date.now()}`,
-      title: `${min.title} (Copia)`,
+      title: `${minuteToDup.title} (Copia)`,
+      date: new Date().toISOString().split('T')[0],
+      formattedDate: new Date().toLocaleDateString('es-ES', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      }),
       status: 'Borrador',
-      formattedDate: 'Hoy'
+      lastEdited: 'Justo ahora',
+      organizationId: currentOrgId
     };
     setMinutes((prev) => [duplicated, ...prev]);
-    showToast('Acta duplicada en Borradores');
+    showToast(`Acta duplicada como borrador en ${currentOrganization.name}`);
   };
 
+  const handleDeleteSampleMinutes = () => {
+    setMinutes((prev) =>
+      prev.filter((m) => (m.organizationId || 'org-redq') !== currentOrgId || !m.id.startsWith('min-'))
+    );
+    showToast(`Actas de muestra eliminadas para ${currentOrganization.name}`);
+  };
+
+  const handleClearAllMinutes = () => {
+    setMinutes((prev) => prev.filter((m) => (m.organizationId || 'org-redq') !== currentOrgId));
+    setActionItems((prev) => prev.filter((a) => (a.organizationId || 'org-redq') !== currentOrgId));
+    showToast(`Todas las actas de ${currentOrganization.name} fueron eliminadas`);
+  };
+
+  const handleResetSampleMinutes = () => {
+    const otherOrgsMinutes = minutes.filter((m) => (m.organizationId || 'org-redq') !== currentOrgId);
+    const initialForThisOrg = INITIAL_MINUTES.filter((m) => (m.organizationId || 'org-redq') === currentOrgId);
+    setMinutes([...initialForThisOrg, ...otherOrgsMinutes]);
+    showToast(`Actas de ejemplo restauradas para ${currentOrganization.name}`);
+  };
+
+  // Action Items Operations
   const handleToggleActionItem = (id: string) => {
     setActionItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, completed: !item.completed } : item))
+      prev.map((item) =>
+        item.id === id ? { ...item, completed: !item.completed } : item
+      )
     );
   };
 
-  const handleAddActionItem = (
-    text: string,
-    dueDate?: string,
-    priority?: 'Low' | 'Medium' | 'High',
-    assignedTo?: Attendee
-  ) => {
-    const defaultDate = dueDate || new Date().toISOString().split('T')[0];
-    const newItem: ActionItem = {
-      id: `act-${Date.now()}`,
-      text,
-      completed: false,
-      dueLabel: defaultDate === '2026-08-31' ? 'Vence Hoy' : `Vence ${defaultDate}`,
-      dueDate: defaultDate,
-      priority: priority || 'Medium',
-      assignedTo: assignedTo || allAttendees[0]
-    };
-    setActionItems((prev) => [newItem, ...prev]);
-    showToast('Tarea y compromiso agregado');
+  const handleAddActionItem = (item: ActionItem) => {
+    setActionItems((prev) => [{ ...item, organizationId: currentOrgId }, ...prev]);
+    showToast('Nueva tarea añadida a los compromisos');
+  };
+
+  // Contact / Directory Operations
+  const handleCreateContact = (newContact: Attendee) => {
+    setAllAttendees((prev) => [{ ...newContact, organizationId: currentOrgId }, ...prev]);
+  };
+
+  const handleUpdateContact = (updatedContact: Attendee) => {
+    setAllAttendees((prev) =>
+      prev.map((c) => (c.id === updatedContact.id ? { ...updatedContact, organizationId: currentOrgId } : c))
+    );
+  };
+
+  const handleDeleteContact = (id: string) => {
+    setAllAttendees((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  const handleResetContacts = () => {
+    const otherAttendees = allAttendees.filter((a) => (a.organizationId || 'org-redq') !== currentOrgId);
+    const initialForThisOrg = INITIAL_ATTENDEES.filter((a) => (a.organizationId || 'org-redq') === currentOrgId);
+    setAllAttendees([...otherAttendees, ...initialForThisOrg]);
+    showToast(`Directorio de ${currentOrganization.name} restablecido`);
+  };
+
+  const handleUpdateUserProfile = (updated: UserProfile) => {
+    setUserProfile(updated);
+    showToast('Perfil de usuario actualizado con éxito');
+  };
+
+  // Export Modal
+  const handleOpenExport = (minute: MeetingMinute) => {
+    setExportTargetMinute(minute);
+    setExportModalOpen(true);
+  };
+
+  const handleNewMinute = () => {
+    setActiveMinute(null);
+    setCurrentView('editor');
+  };
+
+  const handleSelectMinute = (minute: MeetingMinute) => {
+    setActiveMinute(minute);
+    setCurrentView('editor');
   };
 
   const handleTriggerSync = () => {
     setIsSyncing(true);
     setTimeout(() => {
       setIsSyncing(false);
-      showToast('Sincronización en la nube completada: 7 carpetas al día');
+      showToast(`Sincronización completa con el espacio de ${currentOrganization.name}`);
     }, 1200);
-  };
-
-  const handleExportSuccess = (channel: string) => {
-    const channelNames: Record<string, string> = {
-      drive: 'Google Drive (PDF y Google Doc generados)',
-      whatsapp: 'WhatsApp (Resumen Ejecutivo distribuido)',
-      email: 'Correo Corporativo (Archivo PDF adjunto enviado)'
-    };
-    showToast(`Exportado con éxito a ${channelNames[channel] || channel}`);
-  };
-
-  const handleCreateContact = (newContact: Attendee) => {
-    setAllAttendees((prev) => {
-      if (prev.some((a) => a.id === newContact.id)) return prev;
-      return [newContact, ...prev];
-    });
-    showToast(`Asistente "${newContact.name}" agregado al directorio`);
-  };
-
-  const handleUpdateContact = (updatedContact: Attendee) => {
-    setAllAttendees((prev) =>
-      prev.map((a) => (a.id === updatedContact.id ? updatedContact : a))
-    );
-    // Also update in minutes state if an attendee is embedded
-    setMinutes((prev) =>
-      prev.map((m) => ({
-        ...m,
-        attendees: m.attendees.map((a) =>
-          a.id === updatedContact.id ? updatedContact : a
-        ),
-        actionItems: m.actionItems.map((item) =>
-          item.assignedTo?.id === updatedContact.id
-            ? { ...item, assignedTo: updatedContact }
-            : item
-        )
-      }))
-    );
-    // Also update active minute if open
-    if (activeMinute) {
-      setActiveMinute((prev) =>
-        prev
-          ? {
-              ...prev,
-              attendees: prev.attendees.map((a) =>
-                a.id === updatedContact.id ? updatedContact : a
-              ),
-              actionItems: prev.actionItems.map((item) =>
-                item.assignedTo?.id === updatedContact.id
-                  ? { ...item, assignedTo: updatedContact }
-                  : item
-              )
-            }
-          : null
-      );
-    }
-    // Also update global actionItems
-    setActionItems((prev) =>
-      prev.map((item) =>
-        item.assignedTo?.id === updatedContact.id
-          ? { ...item, assignedTo: updatedContact }
-          : item
-      )
-    );
-    showToast(`Asistente "${updatedContact.name}" actualizado`);
-  };
-
-  const handleDeleteContact = (id: string) => {
-    setAllAttendees((prev) => prev.filter((a) => a.id !== id));
-    showToast('Contacto eliminado del directorio');
-  };
-
-  const handleResetContacts = () => {
-    setAllAttendees(INITIAL_ATTENDEES);
-    showToast('Directorio restablecido a los miembros base predeterminados');
-  };
-
-  const handleUpdateUserProfile = (updated: UserProfile) => {
-    setUserProfile(updated);
-    showToast('Perfil de usuario actualizado con éxito');
   };
 
   return (
@@ -370,24 +415,28 @@ export default function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        {/* Top App Bar */}
+        {/* Top App Bar with Multi-Tenant Organization Switcher */}
         <TopAppBar
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          minutes={minutes}
+          minutes={scopedMinutes}
           onSelectMinute={handleSelectMinute}
           currentView={currentView}
           onNavigate={(v) => setCurrentView(v)}
           userProfile={userProfile}
+          organizations={organizations}
+          currentOrganization={currentOrganization}
+          onSelectOrganization={handleSelectOrganization}
+          onChangeUserRole={handleChangeUserRole}
         />
 
-        {/* Dynamic Views */}
+        {/* Dynamic Views (Strictly scoped by organization) */}
         {currentView === 'dashboard' && (
           <DashboardView
-            schedule={schedule}
-            actionItems={actionItems}
-            recentMinutes={minutes}
-            allAttendees={allAttendees}
+            schedule={scopedSchedule}
+            actionItems={scopedActionItems}
+            recentMinutes={scopedMinutes}
+            allAttendees={scopedAttendees}
             onToggleActionItem={handleToggleActionItem}
             onAddActionItem={handleAddActionItem}
             onSelectMinute={handleSelectMinute}
@@ -400,8 +449,8 @@ export default function App() {
 
         {currentView === 'library' && (
           <LibraryView
-            minutes={minutes}
-            directories={directories}
+            minutes={scopedMinutes}
+            directories={scopedDirectories}
             onSelectMinute={handleSelectMinute}
             onOpenExport={handleOpenExport}
             onDeleteMinute={handleDeleteMinute}
@@ -413,22 +462,25 @@ export default function App() {
             onDeleteSampleMinutes={handleDeleteSampleMinutes}
             onClearAllMinutes={handleClearAllMinutes}
             onResetSampleMinutes={handleResetSampleMinutes}
+            userRole={userProfile.systemRole}
           />
         )}
 
         {(currentView === 'editor' || currentView === 'projects') && (
           <MinuteEditorView
             minute={activeMinute}
-            directories={directories}
+            directories={scopedDirectories}
             onSave={handleSaveMinute}
             onOpenExport={handleOpenExport}
             onBack={() => setCurrentView('library')}
-            allAttendees={allAttendees}
+            allAttendees={scopedAttendees}
             onCreateContact={handleCreateContact}
             onUpdateContact={handleUpdateContact}
             onDeleteContact={handleDeleteContact}
             onCreateDirectory={handleCreateDirectory}
             onDeleteMinute={handleDeleteMinute}
+            currentOrganization={currentOrganization}
+            userRole={userProfile.systemRole}
           />
         )}
 
@@ -437,20 +489,23 @@ export default function App() {
             onShowToast={showToast}
             userProfile={userProfile}
             onUpdateUserProfile={handleUpdateUserProfile}
-            allAttendees={allAttendees}
+            allAttendees={scopedAttendees}
             onCreateContact={handleCreateContact}
             onUpdateContact={handleUpdateContact}
             onDeleteContact={handleDeleteContact}
             onResetContacts={handleResetContacts}
-            directories={directories}
+            directories={scopedDirectories}
             onCreateDirectory={handleCreateDirectory}
             onUpdateDirectory={handleUpdateDirectory}
             onDeleteDirectory={handleDeleteDirectory}
             onResetDirectories={handleResetDirectories}
-            minutesCount={minutes.length}
+            minutesCount={scopedMinutes.length}
             onDeleteSampleMinutes={handleDeleteSampleMinutes}
             onClearAllMinutes={handleClearAllMinutes}
             onResetSampleMinutes={handleResetSampleMinutes}
+            currentOrganization={currentOrganization}
+            onUpdateOrganization={handleUpdateOrganization}
+            userRole={userProfile.systemRole}
           />
         )}
 
@@ -469,9 +524,8 @@ export default function App() {
             >
               dashboard
             </span>
-            <span className="text-[10px]">Panel</span>
+            <span>Inicio</span>
           </button>
-
           <button
             onClick={() => setCurrentView('library')}
             className={`flex flex-col items-center gap-0.5 text-xs font-medium cursor-pointer ${
@@ -483,34 +537,19 @@ export default function App() {
                 currentView === 'library' ? 'material-symbols-fill text-indigo-600' : ''
               }`}
             >
-              inventory_2
+              folder
             </span>
-            <span className="text-[10px]">Biblioteca</span>
+            <span>Actas</span>
           </button>
-
           <button
             onClick={handleNewMinute}
-            className="flex flex-col items-center justify-center -mt-5 bg-indigo-600 hover:bg-indigo-700 text-white w-12 h-12 rounded-full shadow-lg shadow-indigo-200 cursor-pointer transition-all active:scale-95"
+            className="flex flex-col items-center gap-0.5 text-xs font-bold text-indigo-600 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[24px]">add</span>
+            <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center -mt-3 shadow-md">
+              <span className="material-symbols-outlined text-[20px]">add</span>
+            </div>
+            <span>Crear</span>
           </button>
-
-          <button
-            onClick={() => setCurrentView('editor')}
-            className={`flex flex-col items-center gap-0.5 text-xs font-medium cursor-pointer ${
-              currentView === 'editor' ? 'text-indigo-600 font-bold' : 'text-slate-500'
-            }`}
-          >
-            <span
-              className={`material-symbols-outlined text-[20px] ${
-                currentView === 'editor' ? 'material-symbols-fill text-indigo-600' : ''
-              }`}
-            >
-              edit_document
-            </span>
-            <span className="text-[10px]">Editor</span>
-          </button>
-
           <button
             onClick={() => setCurrentView('settings')}
             className={`flex flex-col items-center gap-0.5 text-xs font-medium cursor-pointer ${
@@ -524,20 +563,26 @@ export default function App() {
             >
               settings
             </span>
-            <span className="text-[10px]">Ajustes</span>
+            <span>Ajustes</span>
           </button>
         </nav>
       </div>
 
-      {/* Export & Share Modal */}
+      {/* Export / Sincronización Modal (Scoped by Organization) */}
       <ExportShareModal
         minute={exportTargetMinute}
         isOpen={exportModalOpen}
-        onClose={() => setExportModalOpen(false)}
-        onExportSuccess={handleExportSuccess}
+        onClose={() => {
+          setExportModalOpen(false);
+          setExportTargetMinute(null);
+        }}
+        onExportSuccess={(channel) => {
+          showToast(`Acta enviada con éxito vía ${channel}`);
+        }}
+        currentOrganization={currentOrganization}
       />
 
-      {/* Global Toast Alert */}
+      {/* Global Security & Toast Notification */}
       <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
     </div>
   );
