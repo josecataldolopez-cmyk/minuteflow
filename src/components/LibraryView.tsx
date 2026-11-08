@@ -316,27 +316,29 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
-                        {/* Hover action buttons for Folder Edit and Delete */}
+                        {/* Action buttons for Folder Edit and Delete */}
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setEditingFolder(dir);
                             setEditFolderName(dir.name);
                           }}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-indigo-600 hover:bg-white rounded transition-all"
+                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                           title="Renombrar carpeta"
                         >
-                          <span className="material-symbols-outlined text-[14px]">edit</span>
+                          <span className="material-symbols-outlined text-[15px]">edit</span>
                         </button>
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setDeletingFolder(dir);
                           }}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 hover:bg-white rounded transition-all"
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
                           title="Eliminar carpeta"
                         >
-                          <span className="material-symbols-outlined text-[14px]">delete</span>
+                          <span className="material-symbols-outlined text-[15px]">delete</span>
                         </button>
 
                         <span
@@ -417,6 +419,51 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
           {/* Main Minutes Content Area (Span 9) */}
           <div className="col-span-12 md:col-span-9 flex flex-col gap-4">
+            {/* Active Folder Filter Banner */}
+            {selectedDirectory && (
+              <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <span className="material-symbols-outlined text-[20px] material-symbols-fill">
+                      folder_open
+                    </span>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">
+                        Carpeta en Uso:
+                      </span>
+                      <span className="text-[11px] font-bold bg-white text-indigo-900 px-2 py-0.5 rounded-full border border-indigo-200">
+                        {filteredMinutes.length} {filteredMinutes.length === 1 ? 'acta' : 'actas'}
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-900 mt-0.5">
+                      {selectedDirectory}
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (onNewMinute) onNewMinute();
+                    }}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">add</span>
+                    <span>Nueva Acta en esta Carpeta</span>
+                  </button>
+                  <button
+                    onClick={() => setSelectedDirectory(null)}
+                    className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 transition-all cursor-pointer flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">close</span>
+                    <span>Ver Todas</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Bulk Actions Bar */}
             <div className="bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm flex items-center justify-between">
               <div className="flex items-center gap-3">

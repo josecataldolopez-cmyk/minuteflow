@@ -103,6 +103,8 @@ export interface DirectoryItem {
   count: number;
   icon?: string;
   organizationId?: string;
+  driveFolderId?: string;
+  driveFolderUrl?: string;
 }
 
 export type ViewMode = 'dashboard' | 'library' | 'editor' | 'projects' | 'settings';

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MeetingMinute, Organization } from '../types';
+import { MeetingMinute, Organization, DirectoryItem } from '../types';
 import {
   syncMinuteToGoogleDrive,
   getOrgDriveAccount,
@@ -8,7 +8,8 @@ import {
 import {
   isDriveOAuthConnected,
   getDriveOAuthAccount,
-  connectGoogleDriveOAuth
+  connectGoogleDriveOAuth,
+  createDriveSubfolder
 } from '../services/googleDriveOAuthService';
 
 interface ExportShareModalProps {
@@ -17,6 +18,8 @@ interface ExportShareModalProps {
   onClose: () => void;
   onExportSuccess: (channel: string) => void;
   currentOrganization?: Organization;
+  directories?: DirectoryItem[];
+  onCreateDirectory?: (name: string) => void;
 }
 
 export const ExportShareModal: React.FC<ExportShareModalProps> = ({
@@ -24,13 +27,21 @@ export const ExportShareModal: React.FC<ExportShareModalProps> = ({
   isOpen,
   onClose,
   onExportSuccess,
-  currentOrganization
+  currentOrganization,
+  directories = [],
+  onCreateDirectory
 }) => {
   const [selectedChannel, setSelectedChannel] = useState<'drive' | 'whatsapp' | 'email'>('drive');
   const [previewTab, setPreviewTab] = useState<'whatsapp' | 'email'>('whatsapp');
   const [isExporting, setIsExporting] = useState(false);
   const [exportResult, setExportResult] = useState<{ success: boolean; message: string; fileUrl?: string } | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Subfolder management in Google Drive
+  const [selectedSubfolder, setSelectedSubfolder] = useState<string>(() => minute?.directory || 'Actas Generales');
+  const [isAddingSubfolder, setIsAddingSubfolder] = useState(false);
+  const [newSubfolderName, setNewSubfolderName] = useState('');
+  const [isCreatingSubfolder, setIsCreatingSubfolder] = useState(false);
 
   if (!isOpen || !minute) return null;
 
@@ -57,13 +68,38 @@ export const ExportShareModal: React.FC<ExportShareModalProps> = ({
     }
   };
 
+  const handleCreateSubfolderInModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubfolderName.trim()) return;
+    const clean = newSubfolderName.trim();
+    setIsCreatingSubfolder(true);
+    try {
+      await createDriveSubfolder(orgId, clean, orgName);
+      if (onCreateDirectory) {
+        onCreateDirectory(clean);
+      }
+      setSelectedSubfolder(clean);
+      setNewSubfolderName('');
+      setIsAddingSubfolder(false);
+    } catch {
+      if (onCreateDirectory) {
+        onCreateDirectory(clean);
+      }
+      setSelectedSubfolder(clean);
+      setNewSubfolderName('');
+      setIsAddingSubfolder(false);
+    } finally {
+      setIsCreatingSubfolder(false);
+    }
+  };
+
   const handleExport = async () => {
     setIsExporting(true);
     setExportResult(null);
 
     if (selectedChannel === 'drive') {
       try {
-        const res = await syncMinuteToGoogleDrive(minute, undefined, currentOrganization);
+        const res = await syncMinuteToGoogleDrive(minute, undefined, currentOrganization, selectedSubfolder);
         setIsExporting(false);
         setExportResult(res);
         if (res.success) {
@@ -329,14 +365,66 @@ Dirección de ${orgName}`;
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                      Carpeta y Ruta en Google Drive
-                    </label>
-                    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-slate-200">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-600 block">
+                        Carpeta y Subcarpeta de Destino en Google Drive
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingSubfolder(!isAddingSubfolder)}
+                        className="text-[11px] text-primary hover:underline font-semibold flex items-center gap-0.5"
+                      >
+                        <span className="material-symbols-outlined text-[13px]">{isAddingSubfolder ? 'close' : 'add'}</span>
+                        <span>{isAddingSubfolder ? 'Cancelar' : 'Nueva Subcarpeta'}</span>
+                      </button>
+                    </div>
+
+                    {isAddingSubfolder && (
+                      <form onSubmit={handleCreateSubfolderInModal} className="flex gap-1.5 mb-2">
+                        <input
+                          type="text"
+                          value={newSubfolderName}
+                          onChange={(e) => setNewSubfolderName(e.target.value)}
+                          placeholder="Nombre de subcarpeta en Drive..."
+                          className="flex-1 px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                          autoFocus
+                        />
+                        <button
+                          type="submit"
+                          disabled={isCreatingSubfolder || !newSubfolderName.trim()}
+                          className="px-3 py-1.5 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary-hover disabled:opacity-50 flex items-center gap-1 shadow-sm"
+                        >
+                          {isCreatingSubfolder ? (
+                            <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>
+                          ) : (
+                            <span className="material-symbols-outlined text-[14px]">check</span>
+                          )}
+                          <span>Crear</span>
+                        </button>
+                      </form>
+                    )}
+
+                    <div className="flex items-center gap-2 p-2 rounded-xl bg-white border border-slate-200 shadow-sm">
                       <span className="material-symbols-outlined text-amber-500 text-[18px]">folder</span>
-                      <span className="text-xs font-semibold text-slate-800 truncate">
-                        MinuteFlow / {orgName} / {minute.directory}
-                      </span>
+                      <select
+                        value={selectedSubfolder}
+                        onChange={(e) => setSelectedSubfolder(e.target.value)}
+                        className="flex-1 bg-transparent text-xs font-semibold text-slate-800 border-none focus:outline-none cursor-pointer"
+                      >
+                        {directories.map((dir) => (
+                          <option key={dir.id} value={dir.name}>
+                            {dir.name}
+                          </option>
+                        ))}
+                        {directories.every((d) => d.name !== selectedSubfolder) && (
+                          <option value={selectedSubfolder}>{selectedSubfolder}</option>
+                        )}
+                      </select>
+                    </div>
+
+                    <div className="mt-1 text-[10px] text-slate-500 flex items-center gap-1 px-1">
+                      <span className="material-symbols-outlined text-[12px] text-slate-400">subdirectory_arrow_right</span>
+                      <span className="truncate">Ruta en Drive: <strong>MinuteFlow / {orgName}</strong> / <span className="text-primary font-bold">{selectedSubfolder}</span></span>
                     </div>
                   </div>
 

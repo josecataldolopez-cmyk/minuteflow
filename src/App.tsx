@@ -620,6 +620,8 @@ export default function App() {
           showToast(`Acta enviada con éxito vía ${channel}`);
         }}
         currentOrganization={currentOrganization}
+        directories={scopedDirectories}
+        onCreateDirectory={handleCreateDirectory}
       />
 
       {/* Global Security & Toast Notification */}

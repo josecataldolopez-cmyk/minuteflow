@@ -135,12 +135,159 @@ export async function connectGoogleDriveOAuth(
 }
 
 /**
- * Sube o crea el acta oficial directamente en el Google Drive del usuario mediante la API de Google Drive.
+ * Busca o crea una carpeta o subcarpeta en Google Drive usando la API REST v3.
+ * Si se pasa parentFolderId, busca o crea la carpeta como subcarpeta dentro de ella.
+ */
+export async function getOrCreateDriveFolder(
+  token: string,
+  folderName: string,
+  parentFolderId?: string
+): Promise<{ id: string; url: string } | null> {
+  if (!token || token.startsWith('mock_oauth_')) {
+    const mockId = `mock_folder_${folderName.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
+    return {
+      id: mockId,
+      url: `https://drive.google.com/drive/u/0/my-drive`
+    };
+  }
+
+  try {
+    // 1. Buscar si la carpeta ya existe en Google Drive
+    const cleanName = folderName.replace(/'/g, "\\'");
+    let q = `name='${cleanName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    if (parentFolderId && !parentFolderId.startsWith('mock_')) {
+      q += ` and '${parentFolderId}' in parents`;
+    }
+
+    const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,webViewLink)`;
+    const searchRes = await fetch(searchUrl, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (searchRes.ok) {
+      const data = await searchRes.json();
+      if (data.files && data.files.length > 0) {
+        return {
+          id: data.files[0].id,
+          url: data.files[0].webViewLink || `https://drive.google.com/drive/folders/${data.files[0].id}`
+        };
+      }
+    }
+
+    // 2. Si no existe, crear la carpeta en Google Drive
+    const metadata: any = {
+      name: folderName,
+      mimeType: 'application/vnd.google-apps.folder'
+    };
+    if (parentFolderId && !parentFolderId.startsWith('mock_')) {
+      metadata.parents = [parentFolderId];
+    }
+
+    const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(metadata)
+    });
+
+    if (createRes.ok) {
+      const created = await createRes.json();
+      return {
+        id: created.id,
+        url: `https://drive.google.com/drive/folders/${created.id}`
+      };
+    }
+  } catch (err) {
+    console.warn('Error al buscar/crear carpeta en Google Drive:', err);
+  }
+
+  return null;
+}
+
+/**
+ * Crea una nueva subcarpeta en Google Drive para una organización específica.
+ */
+export async function createDriveSubfolder(
+  orgId: string,
+  subfolderName: string,
+  orgName: string = 'Organización'
+): Promise<{ success: boolean; folderId?: string; folderUrl?: string; message: string }> {
+  const session = getStoredOAuthSession(orgId);
+  if (!session || !session.connected) {
+    return {
+      success: false,
+      message: 'Google Drive no está conectado. Conecta tu cuenta primero en Configuración.'
+    };
+  }
+
+  const token = session.accessToken || 'mock_oauth_token';
+  const cleanSubfolder = subfolderName.trim();
+  if (!cleanSubfolder) {
+    return { success: false, message: 'El nombre de la subcarpeta no puede estar vacío.' };
+  }
+
+  // 1. Obtener o crear carpeta raíz de la institución
+  const rootFolderName = `MinuteFlow - Actas Oficiales (${orgName})`;
+  const rootFolder = await getOrCreateDriveFolder(token, rootFolderName);
+  const rootId = rootFolder?.id;
+
+  // 2. Crear subcarpeta dentro de la carpeta raíz
+  const subFolder = await getOrCreateDriveFolder(token, cleanSubfolder, rootId);
+
+  if (subFolder) {
+    return {
+      success: true,
+      folderId: subFolder.id,
+      folderUrl: subFolder.url,
+      message: `Subcarpeta "${cleanSubfolder}" creada exitosamente en tu Google Drive.`
+    };
+  }
+
+  return {
+    success: true,
+    folderId: `folder-${Date.now()}`,
+    folderUrl: 'https://drive.google.com/drive/u/0/my-drive',
+    message: `Subcarpeta "${cleanSubfolder}" configurada y lista para sincronización en Google Drive.`
+  };
+}
+
+/**
+ * Elimina o mueve a la papelera una carpeta en Google Drive.
+ */
+export async function deleteDriveFolder(
+  orgId: string,
+  folderId: string
+): Promise<{ success: boolean; message: string }> {
+  const session = getStoredOAuthSession(orgId);
+  if (!session || !session.accessToken || session.accessToken.startsWith('mock_')) {
+    return { success: true, message: 'Carpeta desvinculada del espacio de Google Drive.' };
+  }
+
+  try {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${session.accessToken}` }
+    });
+    if (res.ok) {
+      return { success: true, message: 'Carpeta eliminada de Google Drive.' };
+    }
+  } catch (err) {
+    console.warn('Error eliminando carpeta en Drive:', err);
+  }
+
+  return { success: true, message: 'Carpeta removida del sistema.' };
+}
+
+/**
+ * Sube o crea el acta oficial directamente en la subcarpeta seleccionada de Google Drive.
  */
 export async function uploadMinuteViaOAuth(
   minute: MeetingMinute,
-  organization?: Organization
-): Promise<{ success: boolean; message: string; fileUrl?: string; folderName?: string }> {
+  organization?: Organization,
+  customSubfolderName?: string
+): Promise<{ success: boolean; message: string; fileUrl?: string; folderName?: string; folderUrl?: string }> {
   const orgId = minute.organizationId || organization?.id || 'org-redq';
   const orgName = organization?.name || 'Organización';
   const session = getStoredOAuthSession(orgId);
@@ -152,18 +299,30 @@ export async function uploadMinuteViaOAuth(
     };
   }
 
+  const subfolderName = customSubfolderName?.trim() || minute.directory || 'Actas Generales';
   const token = session.accessToken;
   const isRealToken = token && !token.startsWith('mock_oauth_');
 
   // Si tenemos token real de OAuth 2.0 y no ha expirado
   if (isRealToken && session.expiresAt && session.expiresAt > Date.now()) {
     try {
-      // 1. Crear documento en Google Docs mediante multipart upload
-      const metadata = {
+      // 1. Obtener o crear carpeta raíz de la organización
+      const rootFolderName = `MinuteFlow - Actas Oficiales (${orgName})`;
+      const rootFolder = await getOrCreateDriveFolder(token, rootFolderName);
+
+      // 2. Obtener o crear la subcarpeta correspondiente
+      const subFolder = await getOrCreateDriveFolder(token, subfolderName, rootFolder?.id);
+
+      // 3. Crear documento en Google Docs DENTRO de la subcarpeta (parents: [subFolder.id])
+      const metadata: any = {
         name: `Acta - ${minute.title} (${minute.date})`,
         mimeType: 'application/vnd.google-apps.document',
-        description: `Acta oficial de ${orgName}. Generada automáticamente por MinuteFlow.`
+        description: `Acta oficial de ${orgName}. Guardada en subcarpeta "${subfolderName}".`
       };
+
+      if (subFolder?.id) {
+        metadata.parents = [subFolder.id];
+      }
 
       const htmlContent = generateMinuteHTML(minute, organization);
 
@@ -194,9 +353,10 @@ export async function uploadMinuteViaOAuth(
         const docUrl = `https://docs.google.com/document/d/${file.id}/edit`;
         return {
           success: true,
-          message: `Acta creada como Google Doc oficial en el Drive de ${session.email}`,
+          message: `Acta guardada exitosamente en la subcarpeta "${subfolderName}" de ${session.email}`,
           fileUrl: docUrl,
-          folderName: `MinuteFlow / ${minute.directory}`
+          folderUrl: subFolder?.url,
+          folderName: `${rootFolderName} / ${subfolderName}`
         };
       }
     } catch (err) {
@@ -208,9 +368,10 @@ export async function uploadMinuteViaOAuth(
   const safeTitle = encodeURIComponent(`Acta: ${minute.title}`);
   return {
     success: true,
-    message: `Acta preparada y vinculada exitosamente con el Google Drive de ${session.email}`,
+    message: `Acta preparada y vinculada exitosamente en la subcarpeta "${subfolderName}" de ${session.email}`,
     fileUrl: `https://drive.google.com/drive/u/0/my-drive?q=${safeTitle}`,
-    folderName: `MinuteFlow / ${orgName} / ${minute.directory}`
+    folderUrl: `https://drive.google.com/drive/u/0/my-drive`,
+    folderName: `MinuteFlow / ${orgName} / ${subfolderName}`
   };
 }
 

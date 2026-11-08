@@ -131,16 +131,18 @@ export interface DriveSyncResponse {
 export async function syncMinuteToGoogleDrive(
   minute: MeetingMinute,
   authorName?: string,
-  organization?: Organization
+  organization?: Organization,
+  customSubfolderName?: string
 ): Promise<DriveSyncResponse> {
   const orgId = minute.organizationId || organization?.id || 'org-primary';
   const orgName = organization?.name || 'Organización';
   const webhookUrl = organization?.driveWebhookUrl || getOrgDriveWebhookUrl(orgId);
   const targetAccount = organization?.driveAccount || getOrgDriveAccount(orgId);
+  const subfolder = customSubfolderName?.trim() || minute.directory || 'Actas Generales';
 
   // 1. Método Preferido: Conexión con 1 Clic (Google OAuth 2.0 Oficial)
   if (isDriveOAuthConnected(orgId)) {
-    const oauthRes = await uploadMinuteViaOAuth(minute, organization);
+    const oauthRes = await uploadMinuteViaOAuth(minute, organization, subfolder);
     return {
       success: oauthRes.success,
       message: oauthRes.message,
