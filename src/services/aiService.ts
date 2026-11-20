@@ -22,28 +22,54 @@ export interface AIAnalysisResult {
 
 /**
  * Enhances rough notes, audio transcripts or minute points using Gemini AI.
+ * Intenta primero mediante la Serverless Function segura (/api/enhance) para no exponer API keys;
+ * si no está disponible, utiliza el SDK directo en cliente o el motor heurístico estructurado.
  */
 export async function analyzeAndEnhanceMinute(
   rawContent: string,
   contextTitle?: string
 ): Promise<AIAnalysisResult> {
-  const ai = getGeminiClient();
-
-  // If no API key is set in environment, provide high-quality simulated intelligent extraction
-  if (!ai) {
-    console.warn('PactaCloud: No VITE_GEMINI_API_KEY detected. Using intelligent rule-based parsing engine.');
-    return simulateAIEnhancement(rawContent, contextTitle);
+  const cleanInput = rawContent?.trim();
+  if (!cleanInput) {
+    return simulateAIEnhancement('', contextTitle);
   }
 
+  // 1. Intentar primero a través del Gateway Serverless seguro en el backend
   try {
-    const prompt = `
+    const serverRes = await fetch('/api/enhance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(15000),
+      body: JSON.stringify({ rawContent: cleanInput, contextTitle })
+    });
+
+    if (serverRes.ok) {
+      const data = await serverRes.json();
+      if (data && (data.title || data.objectives || data.pointsTreated)) {
+        return {
+          title: data.title,
+          objectives: data.objectives,
+          pointsTreated: data.pointsTreated,
+          actionItems: data.actionItems || []
+        };
+      }
+    }
+  } catch {
+    // Si la función serverless no está disponible (ej. entorno de desarrollo estático local), continuar
+  }
+
+  // 2. Intentar con cliente directo si se configuró VITE_GEMINI_API_KEY
+  const ai = getGeminiClient();
+  if (ai) {
+    try {
+      const prompt = `
 Eres un secretario ejecutivo corporativo experto en redacción de actas de directorio y reuniones de alta dirección.
 Analiza las siguientes notas o transcripción de reunión y genera una minuta formal y estructurada.
 
 Contexto / Título preliminar: ${contextTitle || 'Reunión Ejecutiva'}
 Notas/Transcripción de la reunión:
 """
-${rawContent}
+${cleanInput.slice(0, 8000)}
 """
 
 Responde estrictamente en formato JSON válido con la siguiente estructura (sin bloques markdown adicionales fuera del json):
@@ -61,29 +87,35 @@ Responde estrictamente en formato JSON válido con la siguiente estructura (sin 
 }
 `;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-    });
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+      });
 
-    const responseText = response.text || '';
-    // Extract JSON from response
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return {
-        title: parsed.title,
-        objectives: parsed.objectives,
-        pointsTreated: parsed.pointsTreated,
-        actionItems: parsed.actionItems || []
-      };
+      const responseText = response.text || '';
+      // Limpieza de bloques markdown ```json ... ```
+      const cleaned = responseText
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          title: parsed.title,
+          objectives: parsed.objectives,
+          pointsTreated: parsed.pointsTreated,
+          actionItems: parsed.actionItems || []
+        };
+      }
+    } catch (error) {
+      console.warn('Error en llamada directa a Gemini AI, usando motor estructurado:', error);
     }
-
-    return simulateAIEnhancement(rawContent, contextTitle);
-  } catch (error) {
-    console.error('Error generating minute with Gemini AI:', error);
-    return simulateAIEnhancement(rawContent, contextTitle);
   }
+
+  // 3. Fallback estructurado y seguro
+  return simulateAIEnhancement(cleanInput, contextTitle);
 }
 
 /**

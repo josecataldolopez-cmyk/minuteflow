@@ -1,12 +1,23 @@
+export type CanonicalMinuteStatus = 'Borrador' | 'Aprobada' | 'Pendiente de firma' | 'Finalizada';
+
 export type MinuteStatus =
-  | 'Borrador'
-  | 'Aprobada'
-  | 'Pendiente de firma'
-  | 'Finalizada'
+  | CanonicalMinuteStatus
   | 'Draft'
   | 'Approved'
   | 'Pending Sig'
   | 'Finished';
+
+/**
+ * Normaliza cualquier variante lingüística o heredada del estado a su forma canónica en español
+ */
+export function normalizeMinuteStatus(status?: string): CanonicalMinuteStatus {
+  if (!status) return 'Borrador';
+  const clean = status.trim().toLowerCase();
+  if (clean === 'aprobada' || clean === 'approved') return 'Aprobada';
+  if (clean === 'pendiente de firma' || clean === 'pending sig' || clean === 'pendiente') return 'Pendiente de firma';
+  if (clean === 'finalizada' || clean === 'finished') return 'Finalizada';
+  return 'Borrador';
+}
 
 export type UserRole = 'superadmin' | 'admin' | 'editor' | 'reader';
 

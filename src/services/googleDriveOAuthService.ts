@@ -86,7 +86,8 @@ export async function connectGoogleDriveOAuth(
             let detectedEmail = preferredEmail || 'usuario@institucion.cl';
             try {
               const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { Authorization: `Bearer ${token}` },
+                signal: AbortSignal.timeout(10000)
               });
               if (userInfoRes.ok) {
                 const info = await userInfoRes.json();
@@ -161,7 +162,8 @@ export async function getOrCreateDriveFolder(
 
     const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,webViewLink)`;
     const searchRes = await fetch(searchUrl, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(15000)
     });
 
     if (searchRes.ok) {
@@ -189,6 +191,7 @@ export async function getOrCreateDriveFolder(
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
+      signal: AbortSignal.timeout(20000),
       body: JSON.stringify(metadata)
     });
 
@@ -268,7 +271,8 @@ export async function deleteDriveFolder(
   try {
     const res = await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${session.accessToken}` }
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+      signal: AbortSignal.timeout(15000)
     });
     if (res.ok) {
       return { success: true, message: 'Carpeta eliminada de Google Drive.' };
@@ -303,11 +307,20 @@ export async function uploadMinuteViaOAuth(
   const token = session.accessToken;
   const isRealToken = token && !token.startsWith('mock_oauth_');
 
-  // Si tenemos token real de OAuth 2.0 y no ha expirado
+  // Si la sesión ha expirado
+  if (session.expiresAt && session.expiresAt <= Date.now()) {
+    return {
+      success: false,
+      message: `La sesión de Google Drive para ${session.email} ha expirado. Por favor haz clic en "Conectar con Google Drive" para renovar la autorización.`,
+      folderName: `PactaCloud / ${orgName} / ${subfolderName}`
+    };
+  }
+
+  // Si tenemos token real de OAuth 2.0 y está vigente
   if (isRealToken && session.expiresAt && session.expiresAt > Date.now()) {
+    const rootFolderName = `PactaCloud - Actas Oficiales (${orgName})`;
     try {
       // 1. Obtener o crear carpeta raíz de la organización
-      const rootFolderName = `PactaCloud - Actas Oficiales (${orgName})`;
       const rootFolder = await getOrCreateDriveFolder(token, rootFolderName);
 
       // 2. Obtener o crear la subcarpeta correspondiente
@@ -345,6 +358,7 @@ export async function uploadMinuteViaOAuth(
           Authorization: `Bearer ${token}`,
           'Content-Type': `multipart/related; boundary=${boundary}`
         },
+        signal: AbortSignal.timeout(25000),
         body: multipartRequestBody
       });
 
@@ -359,18 +373,31 @@ export async function uploadMinuteViaOAuth(
           folderName: `${rootFolderName} / ${subfolderName}`
         };
       }
-    } catch (err) {
-      console.warn('Error en llamada directa a Google Drive API, usando enlace directo a Docs:', err);
+
+      // Si Google Drive API respondió con código de error
+      const errorText = await res.text();
+      console.error('Google Drive API error response:', res.status, errorText);
+      return {
+        success: false,
+        message: res.status === 401
+          ? `Sesión expirada o no autorizada para ${session.email}. Por favor reconecta tu cuenta.`
+          : `Error al crear el Google Doc (HTTP ${res.status}). Por favor reintenta.`,
+        folderName: `${rootFolderName} / ${subfolderName}`
+      };
+    } catch (err: unknown) {
+      const errDetail = err instanceof Error ? err.message : 'Error de comunicación';
+      console.warn('Error en llamada a Google Drive API:', err);
+      return {
+        success: false,
+        message: `Fallo de comunicación con Google Drive: ${errDetail}. Por favor verifica tu red.`,
+        folderName: `${rootFolderName} / ${subfolderName}`
+      };
     }
   }
 
-  // Fallback garantizado: Genera el enlace directo a Google Drive y Google Docs
-  const safeTitle = encodeURIComponent(`Acta: ${minute.title}`);
   return {
-    success: true,
-    message: `Acta preparada y vinculada exitosamente en la subcarpeta "${subfolderName}" de ${session.email}`,
-    fileUrl: `https://drive.google.com/drive/u/0/my-drive?q=${safeTitle}`,
-    folderUrl: `https://drive.google.com/drive/u/0/my-drive`,
+    success: false,
+    message: `No hay una sesión activa de Google Drive para ${orgName}. Conecta tu cuenta oficial con 1 Clic para exportar.`,
     folderName: `PactaCloud / ${orgName} / ${subfolderName}`
   };
 }

@@ -118,8 +118,13 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
           }
         };
 
-        recognition.onerror = () => {
-          simulateVoiceNotes();
+        recognition.onerror = (e: any) => {
+          console.warn('SpeechRecognition error:', e);
+          setIsListening(false);
+          if (voiceSimulationTimerRef.current) {
+            clearInterval(voiceSimulationTimerRef.current);
+            voiceSimulationTimerRef.current = null;
+          }
         };
 
         speechRecognitionRef.current = recognition;

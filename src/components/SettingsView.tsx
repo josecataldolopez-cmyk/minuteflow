@@ -274,40 +274,75 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
   };
 
-  // Handle Logo Upload from Local Computer
-  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      onShowToast('La imagen es demasiado pesada. Máximo recomendado: 2MB');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result as string;
-      setOrgLogoUrl(base64);
-      setCustomLogoInput('');
-      onShowToast('Logo institucional cargado en memoria. Guarda los cambios para aplicar.');
-    };
-    reader.readAsDataURL(file);
+  // Utilidad de compresión y optimización de imágenes para evitar desborde de localStorage
+  const compressImageForStorage = (file: File, maxDim: number = 256): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(e.target?.result as string);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => resolve(e.target?.result as string);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
   };
 
-  // Handle User Avatar Upload from Local Computer
-  const handleUserAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle Logo Upload from Local Computer (con compresión automática)
+  const handleLogoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      onShowToast('La imagen es demasiado pesada. Máximo recomendado: 2MB');
-      return;
+    try {
+      const compressed = await compressImageForStorage(file, 256);
+      if (compressed) {
+        setOrgLogoUrl(compressed);
+        setCustomLogoInput('');
+        onShowToast('Logo institucional optimizado y cargado. Guarda los cambios para aplicar.');
+      }
+    } catch {
+      onShowToast('No se pudo procesar la imagen seleccionada');
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result as string;
-      setProfileAvatar(base64);
-      setCustomAvatarInput('');
-      onShowToast('Foto de perfil cargada. Haz clic en "Guardar Cambios" para confirmar.');
-    };
-    reader.readAsDataURL(file);
+  };
+
+  // Handle User Avatar Upload from Local Computer (con compresión automática)
+  const handleUserAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImageForStorage(file, 200);
+      if (compressed) {
+        setProfileAvatar(compressed);
+        setCustomAvatarInput('');
+        onShowToast('Foto de perfil optimizada. Haz clic en "Guardar Cambios" para confirmar.');
+      }
+    } catch {
+      onShowToast('No se pudo procesar la foto de perfil');
+    }
   };
 
   const handleSaveProfile = (e: React.FormEvent) => {
