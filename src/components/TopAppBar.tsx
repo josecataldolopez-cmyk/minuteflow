@@ -87,10 +87,13 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
       {/* Left: Organization / Establishment Selector Pill */}
       <div className="flex items-center gap-3">
         {/* Mobile Branding */}
-        <div className="md:hidden flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-sm shadow-indigo-100">
-            MF
+        <div className="md:hidden flex items-center gap-1.5">
+          <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-sm shadow-indigo-100">
+            PC
           </div>
+          <span className="font-extrabold text-sm tracking-tight text-slate-900">
+            Pacta<span className="text-indigo-600">Cloud</span>
+          </span>
         </div>
 
         {/* Multi-Tenant Organization Switcher */}

@@ -229,7 +229,7 @@ export async function createDriveSubfolder(
   }
 
   // 1. Obtener o crear carpeta raíz de la institución
-  const rootFolderName = `MinuteFlow - Actas Oficiales (${orgName})`;
+  const rootFolderName = `PactaCloud - Actas Oficiales (${orgName})`;
   const rootFolder = await getOrCreateDriveFolder(token, rootFolderName);
   const rootId = rootFolder?.id;
 
@@ -307,7 +307,7 @@ export async function uploadMinuteViaOAuth(
   if (isRealToken && session.expiresAt && session.expiresAt > Date.now()) {
     try {
       // 1. Obtener o crear carpeta raíz de la organización
-      const rootFolderName = `MinuteFlow - Actas Oficiales (${orgName})`;
+      const rootFolderName = `PactaCloud - Actas Oficiales (${orgName})`;
       const rootFolder = await getOrCreateDriveFolder(token, rootFolderName);
 
       // 2. Obtener o crear la subcarpeta correspondiente
@@ -371,7 +371,7 @@ export async function uploadMinuteViaOAuth(
     message: `Acta preparada y vinculada exitosamente en la subcarpeta "${subfolderName}" de ${session.email}`,
     fileUrl: `https://drive.google.com/drive/u/0/my-drive?q=${safeTitle}`,
     folderUrl: `https://drive.google.com/drive/u/0/my-drive`,
-    folderName: `MinuteFlow / ${orgName} / ${subfolderName}`
+    folderName: `PactaCloud / ${orgName} / ${subfolderName}`
   };
 }
 
@@ -380,7 +380,7 @@ export async function uploadMinuteViaOAuth(
  * para que Google Drive lo convierta automáticamente en un Google Doc profesional.
  */
 function generateMinuteHTML(minute: MeetingMinute, organization?: Organization): string {
-  const orgName = organization?.name || 'MinuteFlow';
+  const orgName = organization?.name || 'PactaCloud';
   const slogan = organization?.slogan || '';
   const headerText = organization?.headerText || 'DOCUMENTO OFICIAL DE REUNIÓN';
   const primaryColor = organization?.primaryColor || '#4f46e5';
@@ -473,7 +473,7 @@ function generateMinuteHTML(minute: MeetingMinute, organization?: Organization):
         ` : ''}
 
         <div class="footer">
-          Acta oficial resguardada en Google Drive por MinuteFlow Suite para ${orgName}.
+          Acta oficial resguardada en Google Drive por PactaCloud Suite para ${orgName}.
         </div>
       </body>
     </html>

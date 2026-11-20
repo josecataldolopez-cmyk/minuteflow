@@ -20,14 +20,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const primaryColor = currentOrganization?.primaryColor || '#4f46e5';
   const orgLogo = currentOrganization?.logoUrl;
-  const orgName = currentOrganization?.name || 'MinuteFlow';
+  const orgName = currentOrganization?.name || 'PactaCloud';
 
   return (
-    <aside className="hidden md:flex flex-col h-screen w-64 border-r border-slate-200 bg-white py-6 px-4 shrink-0 sticky top-0 select-none z-20">
-      {/* Brand Header */}
-      <div className="flex items-center gap-3 mb-6 px-2 min-w-0">
+    <aside className="hidden md:flex flex-col h-screen w-64 border-r border-slate-200 bg-white py-5 px-4 shrink-0 sticky top-0 select-none z-20">
+      {/* Platform Brand */}
+      <div className="flex items-center justify-between mb-4 px-2 pb-3 border-b border-slate-100">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-indigo-800 text-white flex items-center justify-center font-black text-xs shadow-xs">
+            <span className="material-symbols-outlined text-[16px]">verified</span>
+          </div>
+          <div className="flex items-baseline gap-0.5">
+            <span className="font-extrabold text-base tracking-tight text-slate-900">Pacta</span>
+            <span className="font-extrabold text-base tracking-tight text-indigo-600">Cloud</span>
+          </div>
+        </div>
+        <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded-md border border-indigo-100">
+          Suite
+        </span>
+      </div>
+
+      {/* Establishment / Organization Card */}
+      <div className="flex items-center gap-3 mb-5 px-2.5 py-2 min-w-0 bg-slate-50/80 rounded-xl border border-slate-100">
         <div
-          className="w-10 h-10 rounded-xl text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0 overflow-hidden"
+          className="w-9 h-9 rounded-lg text-white flex items-center justify-center font-bold text-xs shadow-2xs shrink-0 overflow-hidden"
           style={{ backgroundColor: primaryColor }}
         >
           {orgLogo ? (
@@ -36,12 +52,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             orgName.substring(0, 2).toUpperCase()
           )}
         </div>
-        <div className="min-w-0">
-          <h1 className="font-bold text-base text-slate-900 tracking-tight leading-tight truncate" title={orgName}>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-bold text-xs text-slate-900 tracking-tight leading-tight truncate" title={orgName}>
             {orgName}
-          </h1>
-          <p className="text-[11px] text-slate-400 font-medium truncate">
-            {currentOrganization?.slogan || 'Suite Ejecutiva de Actas'}
+          </h2>
+          <p className="text-[10px] text-slate-500 font-medium truncate">
+            {currentOrganization?.slogan || 'Espacio Institucional'}
           </p>
         </div>
       </div>

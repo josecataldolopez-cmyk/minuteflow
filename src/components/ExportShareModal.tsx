@@ -123,7 +123,7 @@ export const ExportShareModal: React.FC<ExportShareModalProps> = ({
     }
   };
 
-  const whatsappMessage = `📋 *Resumen MinuteFlow: ${minute.title}*
+  const whatsappMessage = `📋 *Resumen PactaCloud: ${minute.title}*
 🏢 Establecimiento: ${orgName}
 📅 Fecha: ${minute.formattedDate}
 📁 Carpeta: ${minute.directory}
@@ -258,7 +258,7 @@ Dirección de ${orgName}`;
               </p>
               <div className="flex items-center gap-1.5 text-[10px] text-indigo-700 bg-indigo-50/80 px-2.5 py-1 rounded-lg">
                 <span className="material-symbols-outlined text-[14px]">folder</span>
-                <span className="truncate">Ruta: MinuteFlow / {orgName} / {minute.directory}</span>
+                <span className="truncate">Ruta: PactaCloud / {orgName} / {minute.directory}</span>
               </div>
             </div>
 
@@ -424,7 +424,7 @@ Dirección de ${orgName}`;
 
                     <div className="mt-1 text-[10px] text-slate-500 flex items-center gap-1 px-1">
                       <span className="material-symbols-outlined text-[12px] text-slate-400">subdirectory_arrow_right</span>
-                      <span className="truncate">Ruta en Drive: <strong>MinuteFlow / {orgName}</strong> / <span className="text-primary font-bold">{selectedSubfolder}</span></span>
+                      <span className="truncate">Ruta en Drive: <strong>PactaCloud / {orgName}</strong> / <span className="text-primary font-bold">{selectedSubfolder}</span></span>
                     </div>
                   </div>
 

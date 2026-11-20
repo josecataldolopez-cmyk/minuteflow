@@ -31,7 +31,7 @@ export async function analyzeAndEnhanceMinute(
 
   // If no API key is set in environment, provide high-quality simulated intelligent extraction
   if (!ai) {
-    console.warn('MinuteFlow: No VITE_GEMINI_API_KEY detected. Using intelligent rule-based parsing engine.');
+    console.warn('PactaCloud: No VITE_GEMINI_API_KEY detected. Using intelligent rule-based parsing engine.');
     return simulateAIEnhancement(rawContent, contextTitle);
   }
 

@@ -512,7 +512,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       formattedDate: new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric', year: 'numeric' }),
       time: '12:00',
       status: 'Aprobada',
-      objectives: `Verificar la comunicación automática entre MinuteFlow y Google Drive para ${orgName}.`,
+      objectives: `Verificar la comunicación automática entre PactaCloud y Google Drive para ${orgName}.`,
       pointsTreated: `• Verificación de aislamiento multi-tenant.\n• Conexión establecida con la cuenta ${driveAccount}.\n• Estructura de carpetas y permisos corporativos operativos.`,
       keyDecisions: ['Aislamiento y conexión verificados exitosamente.'],
       actionItems: [
@@ -1076,7 +1076,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         Cuenta institucional: <strong>{oauthAccount}</strong>
                       </p>
                       <p className="text-[11px] text-emerald-700/80 mt-0.5">
-                        Carpeta destino: <code className="bg-white/80 px-1 py-0.5 rounded border border-emerald-200 font-bold">MinuteFlow / {orgName}</code>
+                        Carpeta destino: <code className="bg-white/80 px-1 py-0.5 rounded border border-emerald-200 font-bold">PactaCloud / {orgName}</code>
                       </p>
                     </div>
                   </div>
