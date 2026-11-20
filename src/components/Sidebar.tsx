@@ -68,9 +68,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={onNewMinute}
           id="btn-new-minute-sidebar"
           style={{ backgroundColor: primaryColor }}
-          className="w-full text-white text-sm font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md hover:brightness-105 transition-all active:scale-98 cursor-pointer"
+          className="w-full text-white text-sm font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md hover:brightness-105 transition-all active:scale-98 cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-600"
         >
-          <span className="material-symbols-outlined text-[20px] material-symbols-fill">add</span>
+          <span className="material-symbols-outlined text-[20px] material-symbols-fill" aria-hidden="true">add</span>
           <span>Nueva Acta</span>
         </button>
       </div>

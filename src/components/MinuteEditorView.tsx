@@ -94,8 +94,9 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
   );
   const [showTranscriptionBox, setShowTranscriptionBox] = useState(true);
   const speechRecognitionRef = useRef<any>(null);
+  const voiceSimulationTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Speech Recognition setup with simulation fallback
+  // Speech Recognition setup with simulation fallback & clean unmount
   useEffect(() => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -126,9 +127,22 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
         console.warn('SpeechRecognition init failed, using simulation mode', err);
       }
     }
+
+    return () => {
+      if (voiceSimulationTimerRef.current) {
+        clearInterval(voiceSimulationTimerRef.current);
+        voiceSimulationTimerRef.current = null;
+      }
+      try {
+        speechRecognitionRef.current?.stop();
+      } catch {}
+    };
   }, []);
 
   const simulateVoiceNotes = () => {
+    if (voiceSimulationTimerRef.current) {
+      clearInterval(voiceSimulationTimerRef.current);
+    }
     const samplePhrases = [
       'Se revisó la hoja de ruta de producto y se alinearon los hitos del trimestre...',
       'Aprobada la asignación presupuestaria para auditoría de ciberseguridad...',
@@ -136,11 +150,7 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
       'Se acuerda iniciar el dimensionamiento técnico con los proveedores de ingeniería...'
     ];
     let phraseIndex = 0;
-    const interval = setInterval(() => {
-      if (!isListening) {
-        clearInterval(interval);
-        return;
-      }
+    voiceSimulationTimerRef.current = setInterval(() => {
       setTranscriptionText(samplePhrases[phraseIndex % samplePhrases.length]);
       phraseIndex++;
     }, 4000);
@@ -149,6 +159,10 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
   const toggleListening = () => {
     if (isListening) {
       setIsListening(false);
+      if (voiceSimulationTimerRef.current) {
+        clearInterval(voiceSimulationTimerRef.current);
+        voiceSimulationTimerRef.current = null;
+      }
       try {
         speechRecognitionRef.current?.stop();
       } catch (e) {}

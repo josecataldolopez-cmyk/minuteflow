@@ -230,45 +230,53 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                 {/* Inline Add Action Item */}
                 {isAddingAction && (
-                  <form onSubmit={handleActionSubmit} className="mb-3 p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                  <form onSubmit={handleActionSubmit} className="mb-3 p-3.5 bg-slate-50/90 rounded-xl border border-slate-200/90 space-y-2.5 shadow-xs">
                     <input
                       type="text"
                       value={newActionText}
                       onChange={(e) => setNewActionText(e.target.value)}
-                      placeholder="Nueva tarea o compromiso..."
-                      className="w-full text-xs px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg outline-none focus:border-indigo-500"
+                      placeholder="Escribe la tarea o compromiso oficial..."
+                      className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 font-medium text-slate-800 placeholder:text-slate-400"
                       autoFocus
                     />
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <input
-                        type="date"
-                        value={newActionDueDate}
-                        onChange={(e) => setNewActionDueDate(e.target.value)}
-                        className="text-xs p-1 rounded border border-slate-200 bg-white"
-                      />
-                      <select
-                        value={newActionPriority}
-                        onChange={(e) => setNewActionPriority(e.target.value as any)}
-                        className="text-xs p-1 rounded border border-slate-200 bg-white"
-                      >
-                        <option value="High">Alta</option>
-                        <option value="Medium">Media</option>
-                        <option value="Low">Baja</option>
-                      </select>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Fecha límite</label>
+                        <input
+                          type="date"
+                          value={newActionDueDate}
+                          onChange={(e) => setNewActionDueDate(e.target.value)}
+                          className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 outline-none focus:border-indigo-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Prioridad</label>
+                        <select
+                          value={newActionPriority}
+                          onChange={(e) => setNewActionPriority(e.target.value as any)}
+                          className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 outline-none focus:border-indigo-600 font-medium cursor-pointer"
+                        >
+                          <option value="High">🔴 Alta</option>
+                          <option value="Medium">🟡 Media</option>
+                          <option value="Low">🟢 Baja</option>
+                        </select>
+                      </div>
                     </div>
-                    <div className="flex justify-end gap-1.5 pt-1">
+                    <div className="flex justify-end items-center gap-2 pt-1">
                       <button
                         type="button"
                         onClick={() => setIsAddingAction(false)}
-                        className="text-xs text-slate-500 px-2 py-1"
+                        className="text-xs font-semibold text-slate-600 hover:text-slate-800 px-3 py-1.5 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer"
                       >
                         Cancelar
                       </button>
                       <button
                         type="submit"
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1 rounded-lg font-medium shadow-xs"
+                        disabled={!newActionText.trim()}
+                        className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs px-4 py-1.5 rounded-lg font-bold shadow-xs hover:shadow transition-all cursor-pointer flex items-center gap-1 active:scale-98"
                       >
-                        Guardar
+                        <span className="material-symbols-outlined text-[15px]" aria-hidden="true">check</span>
+                        <span>Guardar</span>
                       </button>
                     </div>
                   </form>
@@ -287,6 +295,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         checked={action.completed}
                         onChange={() => onToggleActionItem(action.id)}
                         className="mt-0.5 w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer shrink-0"
+                        aria-label={`Marcar tarea ${action.text} como completada`}
                       />
                       <div className="flex-1 min-w-0">
                         <p
@@ -296,18 +305,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         >
                           {action.text}
                         </p>
-                        <div className="flex items-center justify-between gap-1 mt-1">
-                          <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                            📅 {action.dueDate || 'Sin fecha'}
+                        <div className="flex items-center justify-between gap-1.5 mt-1">
+                          <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[11px] text-slate-400" aria-hidden="true">calendar_today</span>
+                            <span>{action.dueDate || 'Sin fecha'}</span>
                           </span>
-                          {action.assignedTo && (
-                            <img
-                              src={action.assignedTo.avatarUrl}
-                              alt={action.assignedTo.name}
-                              title={action.assignedTo.name}
-                              className="w-4 h-4 rounded-full object-cover"
-                            />
-                          )}
+                          <div className="flex items-center gap-1.5">
+                            {action.priority && (
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                action.priority === 'High' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                                action.priority === 'Medium' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                                'bg-slate-100 text-slate-600 border border-slate-200'
+                              }`}>
+                                {action.priority === 'High' ? 'Alta' : action.priority === 'Medium' ? 'Media' : 'Baja'}
+                              </span>
+                            )}
+                            {action.assignedTo && (
+                              <img
+                                src={action.assignedTo.avatarUrl}
+                                alt={action.assignedTo.name}
+                                title={action.assignedTo.name}
+                                className="w-4 h-4 rounded-full object-cover border border-slate-200"
+                              />
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>

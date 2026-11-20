@@ -254,9 +254,10 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
         {searchQuery && (
           <button
             onClick={() => onSearchChange('')}
-            className="absolute right-7 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+            aria-label="Borrar búsqueda"
+            className="absolute right-7 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer p-1 rounded-md focus-visible:ring-2 focus-visible:ring-indigo-500"
           >
-            <span className="material-symbols-outlined text-[16px]">close</span>
+            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">close</span>
           </button>
         )}
 
@@ -324,9 +325,10 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
             onClick={() => setShowNotifications(!showNotifications)}
             id="btn-notifications"
             title="Notificaciones y Seguridad"
-            className="text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors p-2 rounded-xl active:scale-95 relative cursor-pointer"
+            aria-label="Ver notificaciones del sistema"
+            className="text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors p-2 rounded-xl active:scale-95 relative cursor-pointer focus-visible:ring-2 focus-visible:ring-indigo-500"
           >
-            <span className="material-symbols-outlined text-[20px]">notifications</span>
+            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">notifications</span>
             {unreadCount > 0 && (
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-emerald-500 rounded-full ring-2 ring-white" />
             )}
@@ -335,15 +337,15 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
           {showNotifications && (
             <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 p-3 z-50 animate-in fade-in">
               <div className="flex justify-between items-center pb-2 border-b border-slate-100 mb-2">
-                <span className="text-xs font-bold text-slate-900">Notificaciones de Seguridad</span>
-                <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
-                  RLS Activo
+                <span className="text-xs font-bold text-slate-900">Notificaciones del Sistema</span>
+                <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                  Estado Activo
                 </span>
               </div>
               <div className="space-y-2">
                 {notifications.map((n) => (
-                  <div key={n.id} className="p-2 rounded-xl bg-slate-50 text-xs text-slate-700 flex flex-col gap-0.5">
-                    <p className="font-medium">{n.text}</p>
+                  <div key={n.id} className="p-2.5 rounded-xl bg-slate-50 text-xs text-slate-700 flex flex-col gap-0.5 border border-slate-100">
+                    <p className="font-semibold text-slate-800">{n.text}</p>
                     <span className="text-[10px] text-slate-400">{n.time}</span>
                   </div>
                 ))}
@@ -356,20 +358,22 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
         <button
           onClick={() => onNavigate('settings')}
           title="Configuración del Establecimiento y Google Drive"
-          className={`p-2 rounded-xl transition-colors cursor-pointer ${
+          aria-label="Ir a Configuración y Google Drive"
+          className={`p-2 rounded-xl transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-indigo-500 ${
             currentView === 'settings'
               ? 'bg-indigo-50 text-indigo-600 font-bold'
               : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
           }`}
         >
-          <span className="material-symbols-outlined text-[20px]">settings</span>
+          <span className="material-symbols-outlined text-[20px]" aria-hidden="true">settings</span>
         </button>
 
         {/* User Profile Avatar with Menu */}
         <div ref={profileRef} className="relative">
           <button
             onClick={() => setShowProfileMenu(!showProfileMenu)}
-            className="flex items-center gap-2 p-1 rounded-full hover:ring-2 hover:ring-indigo-100 transition-all cursor-pointer"
+            aria-label="Abrir menú de usuario"
+            className="flex items-center gap-2 p-1 rounded-full hover:ring-2 hover:ring-indigo-100 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-indigo-500"
           >
             <img
               src={userProfile.avatarUrl}

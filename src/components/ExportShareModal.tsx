@@ -105,14 +105,14 @@ export const ExportShareModal: React.FC<ExportShareModalProps> = ({
         if (res.success) {
           onExportSuccess(`Google Drive (${orgName})`);
         }
-      } catch (err) {
+      } catch (err: unknown) {
         setIsExporting(false);
+        const errMsg = err instanceof Error ? err.message : 'Error de comunicación';
         setExportResult({
-          success: true,
-          message: `Acta transmitida al Google Drive de ${targetDriveAccount}`,
-          fileUrl: 'https://drive.google.com'
+          success: false,
+          message: `No se pudo transferir el acta a Google Drive: ${errMsg}. Por favor verifica tu cuenta o reintenta.`,
+          fileUrl: undefined
         });
-        onExportSuccess(`Google Drive (${orgName})`);
       }
     } else {
       setTimeout(() => {
@@ -478,8 +478,14 @@ Dirección de ${orgName}`;
                     <div className={`p-3 rounded-xl border space-y-1.5 animate-in fade-in ${
                       exportResult.success ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'
                     }`}>
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
-                        <span className="material-symbols-outlined text-[18px] text-emerald-600">check_circle</span>
+                      <div className={`flex items-center gap-1.5 text-xs font-bold ${
+                        exportResult.success ? 'text-emerald-800' : 'text-rose-800'
+                      }`}>
+                        <span className={`material-symbols-outlined text-[18px] ${
+                          exportResult.success ? 'text-emerald-600' : 'text-rose-600'
+                        }`}>
+                          {exportResult.success ? 'check_circle' : 'error'}
+                        </span>
                         <span>{exportResult.message}</span>
                       </div>
                       {exportResult.fileUrl && (

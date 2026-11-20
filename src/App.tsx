@@ -30,26 +30,41 @@ import {
 const CURRENT_DATA_VERSION = 'v2_multitenant_redq_2026';
 
 export default function App() {
-  // Verificación y migración automática de caché local del navegador
+  // Verificación y migración segura de datos sin destruir actas creadas por el usuario
   useEffect(() => {
     const savedVersion = localStorage.getItem('minuteflow_version');
     if (savedVersion !== CURRENT_DATA_VERSION) {
       localStorage.setItem('minuteflow_version', CURRENT_DATA_VERSION);
-      localStorage.setItem('minuteflow_organizations', JSON.stringify(INITIAL_ORGANIZATIONS));
-      localStorage.setItem('minuteflow_current_org_id', 'org-redq');
-      localStorage.setItem('minuteflow_user_profile', JSON.stringify(INITIAL_USER_PROFILE));
-      localStorage.setItem('minuteflow_minutes', JSON.stringify(INITIAL_MINUTES));
-      localStorage.setItem('minuteflow_action_items', JSON.stringify(INITIAL_ACTION_ITEMS));
-      localStorage.setItem('minuteflow_attendees', JSON.stringify(INITIAL_ATTENDEES));
-      localStorage.setItem('minuteflow_directories', JSON.stringify(INITIAL_DIRECTORIES));
-      // Forzar recarga de estados en caso de versión previa
-      setOrganizations(INITIAL_ORGANIZATIONS);
-      setCurrentOrgId('org-redq');
-      setUserProfile(INITIAL_USER_PROFILE);
-      setMinutes(INITIAL_MINUTES);
-      setActionItems(INITIAL_ACTION_ITEMS);
-      setAllAttendees(INITIAL_ATTENDEES);
-      setDirectories(INITIAL_DIRECTORIES);
+
+      // Solo inicializar si las claves no existían previamente en el navegador
+      if (!localStorage.getItem('minuteflow_organizations')) {
+        localStorage.setItem('minuteflow_organizations', JSON.stringify(INITIAL_ORGANIZATIONS));
+        setOrganizations(INITIAL_ORGANIZATIONS);
+      }
+      if (!localStorage.getItem('minuteflow_current_org_id')) {
+        localStorage.setItem('minuteflow_current_org_id', 'org-redq');
+        setCurrentOrgId('org-redq');
+      }
+      if (!localStorage.getItem('minuteflow_user_profile')) {
+        localStorage.setItem('minuteflow_user_profile', JSON.stringify(INITIAL_USER_PROFILE));
+        setUserProfile(INITIAL_USER_PROFILE);
+      }
+      if (!localStorage.getItem('minuteflow_minutes')) {
+        localStorage.setItem('minuteflow_minutes', JSON.stringify(INITIAL_MINUTES));
+        setMinutes(INITIAL_MINUTES);
+      }
+      if (!localStorage.getItem('minuteflow_action_items')) {
+        localStorage.setItem('minuteflow_action_items', JSON.stringify(INITIAL_ACTION_ITEMS));
+        setActionItems(INITIAL_ACTION_ITEMS);
+      }
+      if (!localStorage.getItem('minuteflow_attendees')) {
+        localStorage.setItem('minuteflow_attendees', JSON.stringify(INITIAL_ATTENDEES));
+        setAllAttendees(INITIAL_ATTENDEES);
+      }
+      if (!localStorage.getItem('minuteflow_directories')) {
+        localStorage.setItem('minuteflow_directories', JSON.stringify(INITIAL_DIRECTORIES));
+        setDirectories(INITIAL_DIRECTORIES);
+      }
     }
   }, []);
 
@@ -58,15 +73,11 @@ export default function App() {
 
   // Organizations (Tenants) State
   const [organizations, setOrganizations] = useState<Organization[]>(() => {
-    const savedVersion = localStorage.getItem('minuteflow_version');
-    if (savedVersion !== CURRENT_DATA_VERSION) return INITIAL_ORGANIZATIONS;
     const saved = localStorage.getItem('minuteflow_organizations');
     return saved ? JSON.parse(saved) : INITIAL_ORGANIZATIONS;
   });
 
   const [currentOrgId, setCurrentOrgId] = useState<string>(() => {
-    const savedVersion = localStorage.getItem('minuteflow_version');
-    if (savedVersion !== CURRENT_DATA_VERSION) return 'org-redq';
     return localStorage.getItem('minuteflow_current_org_id') || 'org-redq';
   });
 
@@ -385,8 +396,34 @@ export default function App() {
     );
   };
 
-  const handleAddActionItem = (item: ActionItem) => {
-    setActionItems((prev) => [{ ...item, organizationId: currentOrgId }, ...prev]);
+  const handleAddActionItem = (
+    textOrItem: string | ActionItem,
+    dueDate?: string,
+    priority: 'Low' | 'Medium' | 'High' = 'Medium',
+    assignedTo?: Attendee
+  ) => {
+    let newItem: ActionItem;
+    if (typeof textOrItem === 'string') {
+      const cleanText = textOrItem.trim();
+      if (!cleanText) return;
+      newItem = {
+        id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        text: cleanText,
+        completed: false,
+        dueDate: dueDate || new Date().toISOString().split('T')[0],
+        priority: priority || 'Medium',
+        assignedTo,
+        organizationId: currentOrgId
+      };
+    } else {
+      newItem = {
+        ...textOrItem,
+        id: textOrItem.id || `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        completed: textOrItem.completed ?? false,
+        organizationId: currentOrgId
+      };
+    }
+    setActionItems((prev) => [newItem, ...prev]);
     showToast('Nueva tarea añadida a los compromisos');
   };
 

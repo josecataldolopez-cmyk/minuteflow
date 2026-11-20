@@ -154,11 +154,9 @@ export async function syncMinuteToGoogleDrive(
 
   // 2. Si no hay OAuth ni Webhook configurado
   if (!webhookUrl) {
-    const oauthAccount = getDriveOAuthAccount(orgId) || targetAccount;
     return {
-      success: true,
-      message: `Acta preparada para el Drive de ${oauthAccount}. Haz clic en "Conectar Google Drive" para activar la sincronización oficial con 1 clic.`,
-      fileUrl: `https://drive.google.com/drive/u/0/my-drive`,
+      success: false,
+      message: `No hay conexión activa con Google Drive para ${orgName}. Por favor conecta tu cuenta institucional en 1 Clic o vincula un Webhook.`,
       organizationName: orgName
     };
   }
@@ -196,6 +194,7 @@ export async function syncMinuteToGoogleDrive(
       headers: {
         'Content-Type': 'text/plain;charset=utf-8'
       },
+      signal: AbortSignal.timeout(20000),
       body: JSON.stringify(payload)
     });
 
@@ -222,17 +221,16 @@ export async function syncMinuteToGoogleDrive(
     }
 
     return {
-      success: true,
-      message: `Acta sincronizada con el Drive de ${targetAccount} (${orgName})`,
-      fileUrl: `https://drive.google.com/drive/u/0/my-drive`,
+      success: false,
+      message: `El servidor de Google Apps Script respondió con código HTTP ${response.status} (${response.statusText || 'Petición no completada'}).`,
       organizationName: orgName
     };
-  } catch (error) {
-    console.warn('Drive sync fetch warning (Google Apps Script redirection processed):', error);
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : 'Error de comunicación';
+    console.error('Error sincronizando con Google Drive:', error);
     return {
-      success: true,
-      message: `Acta enviada al Google Drive de ${targetAccount} (${orgName})`,
-      fileUrl: `https://drive.google.com/drive/u/0/my-drive`,
+      success: false,
+      message: `Fallo de comunicación con Google Drive: ${errorMsg}. Por favor verifica tu conexión o reintenta.`,
       organizationName: orgName
     };
   }
