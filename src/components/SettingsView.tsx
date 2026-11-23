@@ -6,6 +6,7 @@ import { GoogleDriveIntegrationTab } from './settings/GoogleDriveIntegrationTab'
 import { DirectoryManagementTab } from './settings/DirectoryManagementTab';
 import { FolderManagementTab } from './settings/FolderManagementTab';
 import { DataManagementTab } from './settings/DataManagementTab';
+import { ErrorBoundary } from './ErrorBoundary';
 
 import { COLOR_PRESETS, LOGO_PRESETS } from '../constants/brandingPresets';
 export { COLOR_PRESETS, LOGO_PRESETS };
@@ -163,69 +164,81 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
         {/* Modular Tabs */}
         {(activeTab === 'all' || activeTab === 'branding') && (
-          <OrganizationBrandingTab
-            currentOrganization={currentOrganization}
-            onUpdateOrganization={onUpdateOrganization}
-            onShowToast={onShowToast}
-            isAdmin={isAdmin}
-            compressImage={compressImage}
-            hasMultipleOrgs={hasMultipleOrgs}
-            onPurgeDemoOrganizations={onPurgeDemoOrganizations}
-          />
+          <ErrorBoundary fallbackTitle="Error al cargar pestaña de Marca">
+            <OrganizationBrandingTab
+              currentOrganization={currentOrganization}
+              onUpdateOrganization={onUpdateOrganization}
+              onShowToast={onShowToast}
+              isAdmin={isAdmin}
+              compressImage={compressImage}
+              hasMultipleOrgs={hasMultipleOrgs}
+              onPurgeDemoOrganizations={onPurgeDemoOrganizations}
+            />
+          </ErrorBoundary>
         )}
 
         {(activeTab === 'all' || activeTab === 'profile') && (
-          <ProfileSettingsTab
-            userProfile={userProfile}
-            onUpdateUserProfile={onUpdateUserProfile}
-            onShowToast={onShowToast}
-            compressImage={compressImage}
-          />
+          <ErrorBoundary fallbackTitle="Error al cargar pestaña de Perfil">
+            <ProfileSettingsTab
+              userProfile={userProfile}
+              onUpdateUserProfile={onUpdateUserProfile}
+              onShowToast={onShowToast}
+              compressImage={compressImage}
+            />
+          </ErrorBoundary>
         )}
 
         {(activeTab === 'all' || activeTab === 'drive') && (
-          <GoogleDriveIntegrationTab
-            currentOrganization={currentOrganization}
-            onUpdateOrganization={onUpdateOrganization}
-            directories={directories}
-            onCreateDirectory={onCreateDirectory}
-            onShowToast={onShowToast}
-            isAdmin={isAdmin}
-          />
+          <ErrorBoundary fallbackTitle="Error al cargar pestaña de Google Drive">
+            <GoogleDriveIntegrationTab
+              currentOrganization={currentOrganization}
+              onUpdateOrganization={onUpdateOrganization}
+              directories={directories}
+              onCreateDirectory={onCreateDirectory}
+              onShowToast={onShowToast}
+              isAdmin={isAdmin}
+            />
+          </ErrorBoundary>
         )}
 
         {(activeTab === 'all' || activeTab === 'directory') && (
-          <DirectoryManagementTab
-            allAttendees={allAttendees}
-            onCreateContact={onCreateContact}
-            onUpdateContact={onUpdateContact}
-            onDeleteContact={onDeleteContact}
-            onResetContacts={onResetContacts}
-            onShowToast={onShowToast}
-            orgName={orgName}
-          />
+          <ErrorBoundary fallbackTitle="Error al cargar pestaña de Directorio">
+            <DirectoryManagementTab
+              allAttendees={allAttendees}
+              onCreateContact={onCreateContact}
+              onUpdateContact={onUpdateContact}
+              onDeleteContact={onDeleteContact}
+              onResetContacts={onResetContacts}
+              onShowToast={onShowToast}
+              orgName={orgName}
+            />
+          </ErrorBoundary>
         )}
 
         {(activeTab === 'all' || activeTab === 'folders') && (
-          <FolderManagementTab
-            directories={directories}
-            onCreateDirectory={onCreateDirectory}
-            onUpdateDirectory={onUpdateDirectory}
-            onDeleteDirectory={onDeleteDirectory}
-            onShowToast={onShowToast}
-            orgName={orgName}
-          />
+          <ErrorBoundary fallbackTitle="Error al cargar pestaña de Carpetas">
+            <FolderManagementTab
+              directories={directories}
+              onCreateDirectory={onCreateDirectory}
+              onUpdateDirectory={onUpdateDirectory}
+              onDeleteDirectory={onDeleteDirectory}
+              onShowToast={onShowToast}
+              orgName={orgName}
+            />
+          </ErrorBoundary>
         )}
 
         {(activeTab === 'all' || activeTab === 'data') && (
-          <DataManagementTab
-            minutesCount={minutesCount}
-            onDeleteSampleMinutes={onDeleteSampleMinutes}
-            onClearAllMinutes={onClearAllMinutes}
-            onResetSampleMinutes={onResetSampleMinutes}
-            onShowToast={onShowToast}
-            orgName={orgName}
-          />
+          <ErrorBoundary fallbackTitle="Error al cargar pestaña de Base de Datos">
+            <DataManagementTab
+              minutesCount={minutesCount}
+              onDeleteSampleMinutes={onDeleteSampleMinutes}
+              onClearAllMinutes={onClearAllMinutes}
+              onResetSampleMinutes={onResetSampleMinutes}
+              onShowToast={onShowToast}
+              orgName={orgName}
+            />
+          </ErrorBoundary>
         )}
       </div>
     </div>

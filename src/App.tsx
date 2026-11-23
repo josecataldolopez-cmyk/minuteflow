@@ -6,6 +6,7 @@ import { LibraryView } from './components/LibraryView';
 import { MinuteEditorView } from './components/MinuteEditorView';
 import { ExportShareModal } from './components/ExportShareModal';
 import { SettingsView } from './components/SettingsView';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Toast } from './components/Toast';
 import { storageService } from './services/storageService';
 import {
@@ -613,30 +614,32 @@ export default function App() {
         )}
 
         {currentView === 'settings' && (
-          <SettingsView
-            onShowToast={showToast}
-            userProfile={userProfile}
-            onUpdateUserProfile={handleUpdateUserProfile}
-            allAttendees={scopedAttendees}
-            onCreateContact={handleCreateContact}
-            onUpdateContact={handleUpdateContact}
-            onDeleteContact={handleDeleteContact}
-            onResetContacts={handleResetContacts}
-            directories={scopedDirectories}
-            onCreateDirectory={handleCreateDirectory}
-            onUpdateDirectory={handleUpdateDirectory}
-            onDeleteDirectory={handleDeleteDirectory}
-            onResetDirectories={handleResetDirectories}
-            minutesCount={scopedMinutes.length}
-            onDeleteSampleMinutes={handleDeleteSampleMinutes}
-            onClearAllMinutes={handleClearAllMinutes}
-            onResetSampleMinutes={handleResetSampleMinutes}
-            currentOrganization={currentOrganization}
-            onUpdateOrganization={handleUpdateOrganization}
-            userRole={userProfile.systemRole}
-            hasMultipleOrgs={organizations.length > 1}
-            onPurgeDemoOrganizations={handlePurgeDemoOrganizations}
-          />
+          <ErrorBoundary fallbackTitle="Inconveniente al cargar Configuración">
+            <SettingsView
+              onShowToast={showToast}
+              userProfile={userProfile}
+              onUpdateUserProfile={handleUpdateUserProfile}
+              allAttendees={scopedAttendees}
+              onCreateContact={handleCreateContact}
+              onUpdateContact={handleUpdateContact}
+              onDeleteContact={handleDeleteContact}
+              onResetContacts={handleResetContacts}
+              directories={scopedDirectories}
+              onCreateDirectory={handleCreateDirectory}
+              onUpdateDirectory={handleUpdateDirectory}
+              onDeleteDirectory={handleDeleteDirectory}
+              onResetDirectories={handleResetDirectories}
+              minutesCount={scopedMinutes.length}
+              onDeleteSampleMinutes={handleDeleteSampleMinutes}
+              onClearAllMinutes={handleClearAllMinutes}
+              onResetSampleMinutes={handleResetSampleMinutes}
+              currentOrganization={currentOrganization}
+              onUpdateOrganization={handleUpdateOrganization}
+              userRole={userProfile.systemRole}
+              hasMultipleOrgs={organizations.length > 1}
+              onPurgeDemoOrganizations={handlePurgeDemoOrganizations}
+            />
+          </ErrorBoundary>
         )}
 
         {/* Mobile Bottom Navigation Bar */}
