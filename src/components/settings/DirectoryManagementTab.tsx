@@ -13,7 +13,7 @@ interface DirectoryManagementTabProps {
 }
 
 export const DirectoryManagementTab: React.FC<DirectoryManagementTabProps> = ({
-  allAttendees,
+  allAttendees = [],
   onCreateContact,
   onUpdateContact,
   onDeleteContact,

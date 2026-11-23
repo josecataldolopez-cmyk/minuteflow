@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Organization } from '../../types';
-import { COLOR_PRESETS, LOGO_PRESETS } from '../SettingsView';
+import { COLOR_PRESETS, LOGO_PRESETS } from '../../constants/brandingPresets';
 
 interface OrganizationBrandingTabProps {
   currentOrganization?: Organization;

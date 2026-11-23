@@ -30,9 +30,14 @@ export const DataManagementTab: React.FC<DataManagementTabProps> = ({
     if (isSupabaseConfigured()) {
       testSupabaseConnection().then((res) => {
         setSupabaseStatus({
-          configured: true,
+          configured: res.success,
           message: res.message,
           latency: res.latencyMs
+        });
+      }).catch((err) => {
+        setSupabaseStatus({
+          configured: false,
+          message: err?.message || 'Error al conectar con Supabase'
         });
       });
     }
