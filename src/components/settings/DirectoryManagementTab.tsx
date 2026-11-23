@@ -47,7 +47,7 @@ export const DirectoryManagementTab: React.FC<DirectoryManagementTabProps> = ({
       id: `att-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       name: newName.trim(),
       role: newRole.trim() || 'Miembro',
-      email: newEmail.trim() || undefined,
+      email: newEmail.trim() || '',
       avatarUrl: newAvatar,
       isCustom: true
     };

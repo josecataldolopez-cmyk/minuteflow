@@ -47,6 +47,10 @@ export const GoogleDriveIntegrationTab: React.FC<GoogleDriveIntegrationTabProps>
   const [isConnectingOAuth, setIsConnectingOAuth] = useState(false);
   const [clientId, setClientId] = useState(() => getGoogleClientId());
   const [showClientIdConfig, setShowClientIdConfig] = useState(false);
+  const [isTestingDrive, setIsTestingDrive] = useState(false);
+  const [showAddSubfolderForm, setShowAddSubfolderForm] = useState(false);
+  const [newSubfolderName, setNewSubfolderName] = useState('');
+  const [isCreatingSubfolder, setIsCreatingSubfolder] = useState(false);
 
   // Sincronizar si cambia currentOrganization
   useEffect(() => {

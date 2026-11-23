@@ -47,6 +47,7 @@ export interface Attendee {
   email: string;
   avatarUrl: string;
   organizationId?: string;
+  isCustom?: boolean;
 }
 
 export interface UserProfile {
@@ -94,6 +95,7 @@ export interface MeetingMinute {
   folderPath?: string;
   lastEdited?: string;
   organizationId?: string;
+  recordingUrl?: string;
 }
 
 export interface ScheduleItem {

@@ -99,6 +99,7 @@ export const storageService = {
               status: m.status,
               objectives: m.objectives,
               pointsTreated: m.points_treated,
+              keyDecisions: m.key_decisions || [],
               nextSessionDate: m.next_session_date,
               organizationId: m.organization_id,
               recordingUrl: m.recording_url,
