@@ -51,7 +51,7 @@ export const storageService = {
       if (supabase) {
         try {
           const rows = orgs.map((o) => ({
-            id: o.id.startsWith('org-') ? undefined : o.id,
+            id: o.id,
             name: o.name,
             code: o.code,
             tax_id: o.taxId,
@@ -65,7 +65,7 @@ export const storageService = {
             slogan: o.slogan,
             header_text: o.headerText,
             address: o.address
-          })).filter(r => r.id);
+          }));
 
           if (rows.length > 0) {
             await supabase.from('organizations').upsert(rows);
@@ -88,7 +88,7 @@ export const storageService = {
             .select('*')
             .eq('organization_id', orgId);
 
-          if (!error && data) {
+          if (!error && data && data.length > 0) {
             return data.map((m: any) => ({
               id: m.id,
               title: m.title,
@@ -119,6 +119,34 @@ export const storageService = {
 
   async saveMinutes(minutes: MeetingMinute[]): Promise<void> {
     localStorage.setItem('minuteflow_minutes', JSON.stringify(minutes));
+
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          const rows = minutes.map((m) => ({
+            id: m.id,
+            organization_id: m.organizationId || 'org-redq',
+            title: m.title,
+            directory_name: m.directory,
+            date: m.date,
+            time: m.time || '12:00',
+            formatted_date: m.formattedDate,
+            status: m.status,
+            objectives: m.objectives,
+            points_treated: m.pointsTreated,
+            next_session_date: m.nextSessionDate || null,
+            recording_url: m.recordingUrl || null
+          }));
+
+          if (rows.length > 0) {
+            await supabase.from('minutes').upsert(rows);
+          }
+        } catch (err) {
+          console.warn('No se pudo sincronizar actas en Supabase:', err);
+        }
+      }
+    }
   },
 
   // ================= COMPROMISOS / TAREAS =================
@@ -130,6 +158,31 @@ export const storageService = {
 
   async saveActionItems(items: ActionItem[]): Promise<void> {
     localStorage.setItem('minuteflow_action_items', JSON.stringify(items));
+
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          const rows = items.map((a) => ({
+            id: a.id,
+            minute_id: a.sourceMinuteId || null,
+            organization_id: a.organizationId || 'org-redq',
+            title: a.text,
+            assignee: a.assignedTo?.name || 'Sin asignar',
+            assignee_avatar: a.assignedTo?.avatarUrl || null,
+            due_date: a.dueDate,
+            status: a.completed ? 'COMPLETED' : 'PENDING',
+            priority: a.priority ? a.priority.toUpperCase() : 'MEDIUM'
+          }));
+
+          if (rows.length > 0) {
+            await supabase.from('action_items').upsert(rows);
+          }
+        } catch (err) {
+          console.warn('No se pudo sincronizar compromisos en Supabase:', err);
+        }
+      }
+    }
   },
 
   // ================= CONTACTOS Y ASISTENTES =================
@@ -141,6 +194,28 @@ export const storageService = {
 
   async saveAttendees(attendees: Attendee[]): Promise<void> {
     localStorage.setItem('minuteflow_attendees', JSON.stringify(attendees));
+
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          const rows = attendees.map((att) => ({
+            id: att.id,
+            organization_id: att.organizationId || 'org-redq',
+            name: att.name,
+            email: att.email,
+            role: att.role || 'Miembro',
+            avatar_url: att.avatarUrl || null
+          }));
+
+          if (rows.length > 0) {
+            await supabase.from('attendees').upsert(rows);
+          }
+        } catch (err) {
+          console.warn('No se pudo sincronizar asistentes en Supabase:', err);
+        }
+      }
+    }
   },
 
   // ================= CARPETAS / DIRECTORIOS =================
@@ -152,6 +227,26 @@ export const storageService = {
 
   async saveDirectories(directories: DirectoryItem[]): Promise<void> {
     localStorage.setItem('minuteflow_directories', JSON.stringify(directories));
+
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          const rows = directories.map((d) => ({
+            id: d.id,
+            organization_id: d.organizationId || 'org-redq',
+            name: d.name,
+            color: '#4f46e5'
+          }));
+
+          if (rows.length > 0) {
+            await supabase.from('directories').upsert(rows);
+          }
+        } catch (err) {
+          console.warn('No se pudo sincronizar directorios en Supabase:', err);
+        }
+      }
+    }
   },
 
   // ================= PERFIL DE USUARIO =================

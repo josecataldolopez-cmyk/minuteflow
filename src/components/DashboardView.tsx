@@ -286,6 +286,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   {actionItems.slice(0, 5).map((action) => (
                     <div
                       key={action.id}
+                      onClick={() => onToggleActionItem(action.id)}
                       className={`flex items-start gap-2.5 p-2.5 rounded-xl hover:bg-slate-50 border border-slate-100 transition-colors cursor-pointer group ${
                         action.completed ? 'opacity-60 bg-slate-50/50' : 'bg-white'
                       }`}
@@ -293,6 +294,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <input
                         type="checkbox"
                         checked={action.completed}
+                        onClick={(e) => e.stopPropagation()}
                         onChange={() => onToggleActionItem(action.id)}
                         className="mt-0.5 w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer shrink-0"
                         aria-label={`Marcar tarea ${action.text} como completada`}

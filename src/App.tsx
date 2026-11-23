@@ -7,6 +7,7 @@ import { MinuteEditorView } from './components/MinuteEditorView';
 import { ExportShareModal } from './components/ExportShareModal';
 import { SettingsView } from './components/SettingsView';
 import { Toast } from './components/Toast';
+import { storageService } from './services/storageService';
 import {
   MeetingMinute,
   ViewMode,
@@ -88,51 +89,73 @@ export default function App() {
 
   // User Profile State with local storage
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
-    const savedVersion = localStorage.getItem('minuteflow_version');
-    if (savedVersion !== CURRENT_DATA_VERSION) return INITIAL_USER_PROFILE;
     const saved = localStorage.getItem('minuteflow_user_profile');
     if (saved) {
-      const parsed = JSON.parse(saved);
-      return {
-        ...INITIAL_USER_PROFILE,
-        ...parsed,
-        organizationId: parsed.organizationId || currentOrgId,
-        organizationName: parsed.organizationName || currentOrganization.name,
-        systemRole: parsed.systemRole || 'admin'
-      };
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          ...INITIAL_USER_PROFILE,
+          ...parsed,
+          organizationId: parsed.organizationId || currentOrgId,
+          organizationName: parsed.organizationName || currentOrganization.name,
+          systemRole: parsed.systemRole || 'admin'
+        };
+      } catch {
+        return INITIAL_USER_PROFILE;
+      }
     }
     return INITIAL_USER_PROFILE;
   });
 
   // Core Data with Local Storage fallback
   const [minutes, setMinutes] = useState<MeetingMinute[]>(() => {
-    const savedVersion = localStorage.getItem('minuteflow_version');
-    if (savedVersion !== CURRENT_DATA_VERSION) return INITIAL_MINUTES;
     const saved = localStorage.getItem('minuteflow_minutes');
-    return saved ? JSON.parse(saved) : INITIAL_MINUTES;
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return INITIAL_MINUTES;
+      }
+    }
+    return INITIAL_MINUTES;
   });
 
   const [actionItems, setActionItems] = useState<ActionItem[]>(() => {
-    const savedVersion = localStorage.getItem('minuteflow_version');
-    if (savedVersion !== CURRENT_DATA_VERSION) return INITIAL_ACTION_ITEMS;
     const saved = localStorage.getItem('minuteflow_action_items');
-    return saved ? JSON.parse(saved) : INITIAL_ACTION_ITEMS;
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return INITIAL_ACTION_ITEMS;
+      }
+    }
+    return INITIAL_ACTION_ITEMS;
   });
 
   const [allAttendees, setAllAttendees] = useState<Attendee[]>(() => {
-    const savedVersion = localStorage.getItem('minuteflow_version');
-    if (savedVersion !== CURRENT_DATA_VERSION) return INITIAL_ATTENDEES;
     const saved = localStorage.getItem('minuteflow_attendees');
-    return saved ? JSON.parse(saved) : INITIAL_ATTENDEES;
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return INITIAL_ATTENDEES;
+      }
+    }
+    return INITIAL_ATTENDEES;
   });
 
   const [schedule] = useState(INITIAL_SCHEDULE);
 
   const [directories, setDirectories] = useState<DirectoryItem[]>(() => {
-    const savedVersion = localStorage.getItem('minuteflow_version');
-    if (savedVersion !== CURRENT_DATA_VERSION) return INITIAL_DIRECTORIES;
     const saved = localStorage.getItem('minuteflow_directories');
-    return saved ? JSON.parse(saved) : INITIAL_DIRECTORIES;
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return INITIAL_DIRECTORIES;
+      }
+    }
+    return INITIAL_DIRECTORIES;
   });
 
   // Active Editor and Modal States
@@ -145,9 +168,9 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Persist data on change
+  // Persist data on change (LocalStorage + Supabase Cloud Sync)
   useEffect(() => {
-    localStorage.setItem('minuteflow_organizations', JSON.stringify(organizations));
+    storageService.saveOrganizations(organizations);
   }, [organizations]);
 
   useEffect(() => {
@@ -155,23 +178,23 @@ export default function App() {
   }, [currentOrgId]);
 
   useEffect(() => {
-    localStorage.setItem('minuteflow_minutes', JSON.stringify(minutes));
+    storageService.saveMinutes(minutes);
   }, [minutes]);
 
   useEffect(() => {
-    localStorage.setItem('minuteflow_action_items', JSON.stringify(actionItems));
+    storageService.saveActionItems(actionItems);
   }, [actionItems]);
 
   useEffect(() => {
-    localStorage.setItem('minuteflow_attendees', JSON.stringify(allAttendees));
+    storageService.saveAttendees(allAttendees);
   }, [allAttendees]);
 
   useEffect(() => {
-    localStorage.setItem('minuteflow_directories', JSON.stringify(directories));
+    storageService.saveDirectories(directories);
   }, [directories]);
 
   useEffect(() => {
-    localStorage.setItem('minuteflow_user_profile', JSON.stringify(userProfile));
+    storageService.saveUserProfile(userProfile);
   }, [userProfile]);
 
   const showToast = (msg: string) => {

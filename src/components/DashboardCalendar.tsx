@@ -662,6 +662,7 @@ export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
                         <input
                           type="checkbox"
                           checked={action.completed}
+                          onClick={(e) => e.stopPropagation()}
                           onChange={() => onToggleActionItem(action.id)}
                           className="mt-1 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
                         />
