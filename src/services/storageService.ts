@@ -152,6 +152,33 @@ export const storageService = {
 
   // ================= COMPROMISOS / TAREAS =================
   async getActionItems(orgId: string): Promise<ActionItem[]> {
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('action_items')
+            .select('*')
+            .eq('organization_id', orgId);
+
+          if (!error && data && data.length > 0) {
+            return data.map((a: any) => ({
+              id: a.id,
+              text: a.title,
+              completed: a.status === 'COMPLETED',
+              priority: (a.priority ? a.priority.charAt(0).toUpperCase() + a.priority.slice(1).toLowerCase() : 'Medium') as any,
+              dueDate: a.due_date,
+              assignedTo: a.assignee ? { id: `att-${a.id}`, name: a.assignee, email: '', avatarUrl: a.assignee_avatar || '' } : undefined,
+              sourceMinuteId: a.minute_id,
+              organizationId: a.organization_id
+            }));
+          }
+        } catch (err) {
+          console.warn('Fallback a localStorage para compromisos:', err);
+        }
+      }
+    }
+
     const saved = localStorage.getItem('minuteflow_action_items');
     const all: ActionItem[] = saved ? JSON.parse(saved) : INITIAL_ACTION_ITEMS;
     return all.filter((a) => (a.organizationId || 'org-redq') === orgId);
@@ -188,6 +215,31 @@ export const storageService = {
 
   // ================= CONTACTOS Y ASISTENTES =================
   async getAttendees(orgId: string): Promise<Attendee[]> {
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('attendees')
+            .select('*')
+            .eq('organization_id', orgId);
+
+          if (!error && data && data.length > 0) {
+            return data.map((att: any) => ({
+              id: att.id,
+              name: att.name,
+              email: att.email || '',
+              role: att.role || 'Miembro',
+              avatarUrl: att.avatar_url || '',
+              organizationId: att.organization_id
+            }));
+          }
+        } catch (err) {
+          console.warn('Fallback a localStorage para asistentes:', err);
+        }
+      }
+    }
+
     const saved = localStorage.getItem('minuteflow_attendees');
     const all: Attendee[] = saved ? JSON.parse(saved) : INITIAL_ATTENDEES;
     return all.filter((a) => (a.organizationId || 'org-redq') === orgId);
@@ -221,6 +273,30 @@ export const storageService = {
 
   // ================= CARPETAS / DIRECTORIOS =================
   async getDirectories(orgId: string): Promise<DirectoryItem[]> {
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('directories')
+            .select('*')
+            .eq('organization_id', orgId);
+
+          if (!error && data && data.length > 0) {
+            return data.map((d: any) => ({
+              id: d.id,
+              name: d.name,
+              count: 0,
+              icon: 'folder',
+              organizationId: d.organization_id
+            }));
+          }
+        } catch (err) {
+          console.warn('Fallback a localStorage para directorios:', err);
+        }
+      }
+    }
+
     const saved = localStorage.getItem('minuteflow_directories');
     const all: DirectoryItem[] = saved ? JSON.parse(saved) : INITIAL_DIRECTORIES;
     return all.filter((d) => (d.organizationId || 'org-redq') === orgId);
