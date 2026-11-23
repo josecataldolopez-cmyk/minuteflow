@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Organization } from '../../types';
 import { COLOR_PRESETS, LOGO_PRESETS } from '../SettingsView';
 
@@ -17,6 +17,14 @@ export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = (
   isAdmin,
   compressImage
 }) => {
+  // Estados para datos institucionales / recinto
+  const [orgName, setOrgName] = useState(currentOrganization?.name || 'Establecimiento Principal');
+  const [orgCode, setOrgCode] = useState(currentOrganization?.code || 'INST-01');
+  const [orgTaxId, setOrgTaxId] = useState(currentOrganization?.taxId || '');
+  const [orgAddress, setOrgAddress] = useState(currentOrganization?.address || '');
+  const [orgDomain, setOrgDomain] = useState(currentOrganization?.domain || '');
+  
+  // Estados para identidad visual y membretes
   const [orgPrimaryColor, setOrgPrimaryColor] = useState(
     currentOrganization?.primaryColor || '#4f46e5'
   );
@@ -28,8 +36,20 @@ export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = (
   );
   const [isEditing, setIsEditing] = useState(false);
 
-  const orgName = currentOrganization?.name || 'Establecimiento Principal';
-  const orgCode = currentOrganization?.code || 'INST-01';
+  // Sincronizar estados cuando cambie currentOrganization
+  useEffect(() => {
+    if (currentOrganization) {
+      setOrgName(currentOrganization.name || '');
+      setOrgCode(currentOrganization.code || '');
+      setOrgTaxId(currentOrganization.taxId || '');
+      setOrgAddress(currentOrganization.address || '');
+      setOrgDomain(currentOrganization.domain || '');
+      setOrgPrimaryColor(currentOrganization.primaryColor || '#4f46e5');
+      setOrgLogoUrl(currentOrganization.logoUrl || '');
+      setOrgSlogan(currentOrganization.slogan || '');
+      setOrgHeaderText(currentOrganization.headerText || 'DOCUMENTO OFICIAL DE REUNIÓN');
+    }
+  }, [currentOrganization]);
 
   const handleLogoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -50,9 +70,16 @@ export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = (
     e.preventDefault();
     if (!currentOrganization || !onUpdateOrganization) return;
 
+    const trimmedName = orgName.trim() || currentOrganization.name;
     const finalLogo = customLogoInput.trim() || orgLogoUrl;
+
     const updated: Organization = {
       ...currentOrganization,
+      name: trimmedName,
+      code: orgCode.trim() || currentOrganization.code,
+      taxId: orgTaxId.trim(),
+      address: orgAddress.trim(),
+      domain: orgDomain.trim(),
       primaryColor: orgPrimaryColor,
       logoUrl: finalLogo,
       slogan: orgSlogan.trim(),
@@ -61,32 +88,45 @@ export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = (
 
     onUpdateOrganization(updated);
     setIsEditing(false);
-    onShowToast(`Identidad visual y membrete actualizados para ${orgName}`);
+    onShowToast(`Datos de "${trimmedName}" actualizados correctamente`);
   };
 
   return (
-    <div className="bento-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+    <div className="bento-card bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-6">
+      {/* Header del Bloque */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
         <div className="flex items-center gap-3">
           <div
-            className="w-11 h-11 rounded-2xl text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0 overflow-hidden"
+            className="w-12 h-12 rounded-2xl text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0 overflow-hidden"
             style={{ backgroundColor: orgPrimaryColor }}
           >
             {orgLogoUrl ? (
               <img src={orgLogoUrl} alt={orgName} className="w-full h-full object-cover" />
             ) : (
-              <span className="material-symbols-outlined text-[24px]" aria-hidden="true">palette</span>
+              <span className="material-symbols-outlined text-[26px]" aria-hidden="true">corporate_fare</span>
             )}
           </div>
           <div>
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <span>Identidad Visual y Datos del Establecimiento</span>
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 flex-wrap">
+              <span>{orgName}</span>
               <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full font-bold">
-                ID: {orgCode}
+                CÓD: {orgCode}
               </span>
+              {orgTaxId && (
+                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
+                  RUT: {orgTaxId}
+                </span>
+              )}
             </h3>
             <p className="text-xs text-slate-500">
-              Personaliza los colores institucionales, logo oficial, lema y membrete de actas para <strong>{orgName}</strong>.
+              {orgAddress ? (
+                <span className="inline-flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[13px] text-slate-400">location_on</span>
+                  {orgAddress}
+                </span>
+              ) : (
+                'Configura los datos del establecimiento, recinto o institución, logotipo y membrete oficial.'
+              )}
             </p>
           </div>
         </div>
@@ -95,19 +135,135 @@ export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = (
           <button
             type="button"
             onClick={() => setIsEditing(!isEditing)}
-            className="text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3.5 py-2 rounded-xl font-bold transition-colors cursor-pointer flex items-center gap-1.5 self-start sm:self-auto border border-indigo-100"
+            className="text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-xl font-bold transition-colors cursor-pointer flex items-center gap-1.5 self-start sm:self-auto border border-indigo-100 shadow-2xs"
           >
             <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
-              {isEditing ? 'close' : 'palette'}
+              {isEditing ? 'close' : 'edit_square'}
             </span>
-            <span>{isEditing ? 'Cancelar' : 'Personalizar Marca & Colores'}</span>
+            <span>{isEditing ? 'Cancelar Edición' : 'Modificar Datos del Establecimiento'}</span>
           </button>
         )}
       </div>
 
       {isEditing ? (
         <form onSubmit={handleSaveBranding} className="space-y-6 pt-1">
-          {/* Logo Upload Section */}
+          {/* SECCIÓN 1: Datos Generales del Establecimiento / Recinto */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-4">
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+              <span className="material-symbols-outlined text-indigo-600 text-[20px]" aria-hidden="true">
+                domain
+              </span>
+              <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                Datos del Establecimiento, Institución o Recinto
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Nombre Oficial del Establecimiento / Institución *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={orgName}
+                  onChange={(e) => setOrgName(e.target.value)}
+                  placeholder="Ej. Colegio San Ignacio, Hospital Clínico Central, RedQ S.A."
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-800 shadow-2xs"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Código o Sigla del Establecimiento *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={orgCode}
+                  onChange={(e) => setOrgCode(e.target.value)}
+                  placeholder="Ej. CSI-01, HOSP-CENTRAL, REDQ"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-800 shadow-2xs"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  RUT o Identificador Fiscal
+                </label>
+                <input
+                  type="text"
+                  value={orgTaxId}
+                  onChange={(e) => setOrgTaxId(e.target.value)}
+                  placeholder="Ej. 76.890.123-K"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-800 shadow-2xs"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Recinto, Campus o Dirección de la Sede
+                </label>
+                <input
+                  type="text"
+                  value={orgAddress}
+                  onChange={(e) => setOrgAddress(e.target.value)}
+                  placeholder="Ej. Sede Central, Av. Libertador Bernardo O'Higgins 1234"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-800 shadow-2xs"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Dominio Web Institucional
+                </label>
+                <input
+                  type="text"
+                  value={orgDomain}
+                  onChange={(e) => setOrgDomain(e.target.value)}
+                  placeholder="Ej. redq.cl, colegiosanignacio.cl, pactacloud.cl"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-800 shadow-2xs"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* SECCIÓN 2: Membrete Oficial y Lema */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-4">
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+              <span className="material-symbols-outlined text-indigo-600 text-[20px]" aria-hidden="true">
+                description
+              </span>
+              <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                Membrete Oficial y Lema para Actas
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Lema o Slogan Institucional</label>
+                <input
+                  type="text"
+                  value={orgSlogan}
+                  onChange={(e) => setOrgSlogan(e.target.value)}
+                  placeholder="Ej. Formando líderes con vocación y excelencia"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium shadow-2xs"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Membrete Oficial para Google Docs y Actas</label>
+                <input
+                  type="text"
+                  value={orgHeaderText}
+                  onChange={(e) => setOrgHeaderText(e.target.value)}
+                  placeholder="Ej. COLEGIO SAN IGNACIO — CONSEJO DE DIRECCIÓN"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium shadow-2xs"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* SECCIÓN 3: Logotipo del Establecimiento */}
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -137,7 +293,7 @@ export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = (
                     <button
                       type="button"
                       onClick={() => { setOrgLogoUrl(''); setCustomLogoInput(''); }}
-                      className="text-xs text-rose-600 hover:text-rose-800 px-2 py-1 cursor-pointer"
+                      className="text-xs text-rose-600 hover:text-rose-800 px-2 py-1 cursor-pointer font-medium"
                     >
                       Quitar logo
                     </button>
@@ -172,7 +328,7 @@ export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = (
             </div>
           </div>
 
-          {/* Color Palette */}
+          {/* SECCIÓN 4: Color Corporativo */}
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
             <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
               <span className="material-symbols-outlined text-indigo-600 text-[18px]" aria-hidden="true">colorize</span>
@@ -198,63 +354,63 @@ export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = (
             </div>
           </div>
 
-          {/* Slogan and Header */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Lema o Slogan Institucional</label>
-              <input
-                type="text"
-                value={orgSlogan}
-                onChange={(e) => setOrgSlogan(e.target.value)}
-                placeholder="Ej. Formando líderes con vocación y excelencia"
-                className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Membrete Oficial para Google Docs y Actas</label>
-              <input
-                type="text"
-                value={orgHeaderText}
-                onChange={(e) => setOrgHeaderText(e.target.value)}
-                placeholder="Ej. COLEGIO SAN IGNACIO — CONSEJO DE DIRECCIÓN"
-                className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
             <button
               type="button"
               onClick={() => setIsEditing(false)}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+              className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5"
+              className="px-5 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5"
             >
               <span className="material-symbols-outlined text-[16px]" aria-hidden="true">check</span>
-              <span>Guardar Identidad Institucional</span>
+              <span>Guardar Datos del Establecimiento</span>
             </button>
           </div>
         </form>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-            <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">Color Oficial:</span>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="w-4 h-4 rounded-full shadow-2xs shrink-0" style={{ backgroundColor: orgPrimaryColor }} />
-              <span className="text-xs font-bold text-slate-800">{orgPrimaryColor}</span>
+        /* VISTA INFORMATIVA (Bento Grid) */
+        <div className="space-y-3 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">Establecimiento / Razón Social:</span>
+              <p className="text-xs font-bold text-slate-800 truncate">{orgName}</p>
+              <span className="text-[10px] text-slate-500">Cód: {orgCode}</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">RUT / ID Tributario:</span>
+              <p className="text-xs font-bold text-slate-800 truncate">{orgTaxId || 'No registrado'}</p>
+              <span className="text-[10px] text-slate-500">{orgDomain || 'Sin dominio registrado'}</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">Recinto o Sede:</span>
+              <p className="text-xs font-bold text-slate-800 truncate">{orgAddress || 'Sede Principal'}</p>
+              <span className="text-[10px] text-slate-500">Ubicación para actas</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">Color Oficial:</span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="w-4 h-4 rounded-full shadow-2xs shrink-0" style={{ backgroundColor: orgPrimaryColor }} />
+                <span className="text-xs font-bold text-slate-800">{orgPrimaryColor}</span>
+              </div>
             </div>
           </div>
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-            <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">Lema Institucional:</span>
-            <p className="text-xs font-bold text-slate-800 truncate">{orgSlogan || 'Sin lema configurado'}</p>
-          </div>
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-            <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">Membrete en Documentos:</span>
-            <p className="text-xs font-bold text-slate-800 truncate">{orgHeaderText || 'DOCUMENTO OFICIAL'}</p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">Lema Institucional:</span>
+              <p className="text-xs font-bold text-slate-800 truncate">{orgSlogan || 'Sin lema configurado'}</p>
+            </div>
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">Membrete en Documentos y Actas:</span>
+              <p className="text-xs font-bold text-slate-800 truncate">{orgHeaderText || 'DOCUMENTO OFICIAL'}</p>
+            </div>
           </div>
         </div>
       )}

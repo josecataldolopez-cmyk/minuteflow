@@ -29,7 +29,8 @@ export const storageService = {
               primaryColor: o.primary_color || '#4f46e5',
               secondaryColor: o.secondary_color,
               slogan: o.slogan,
-              headerText: o.header_text
+              headerText: o.header_text,
+              address: o.address
             }));
           }
         } catch (err) {
@@ -62,7 +63,8 @@ export const storageService = {
             primary_color: o.primaryColor,
             secondary_color: o.secondaryColor,
             slogan: o.slogan,
-            header_text: o.headerText
+            header_text: o.headerText,
+            address: o.address
           })).filter(r => r.id);
 
           if (rows.length > 0) {
