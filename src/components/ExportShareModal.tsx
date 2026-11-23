@@ -54,6 +54,11 @@ export const ExportShareModal: React.FC<ExportShareModalProps> = ({
   const [oauthConnected, setOauthConnected] = useState(() => isDriveOAuthConnected(orgId));
   const [activeOAuthEmail, setActiveOAuthEmail] = useState(() => getDriveOAuthAccount(orgId) || targetDriveAccount);
 
+  useEffect(() => {
+    setOauthConnected(isDriveOAuthConnected(orgId));
+    setActiveOAuthEmail(getDriveOAuthAccount(orgId) || targetDriveAccount);
+  }, [orgId, targetDriveAccount]);
+
   const handleConnectGoogleInModal = async () => {
     setIsConnectingGoogleModal(true);
     try {

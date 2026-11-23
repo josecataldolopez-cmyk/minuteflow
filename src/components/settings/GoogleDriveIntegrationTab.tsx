@@ -41,31 +41,57 @@ export const GoogleDriveIntegrationTab: React.FC<GoogleDriveIntegrationTabProps>
 
   // OAuth States
   const [isOAuthConnected, setIsOAuthConnected] = useState(() => isDriveOAuthConnected(orgId));
-  const [oauthAccount, setOauthAccount] = useState(() => getDriveOAuthAccount(orgId) || targetAccount);
+  const [oauthAccount, setOauthAccount] = useState(() => getDriveOAuthAccount(orgId) || targetAccount || '');
+  const [driveEmailInput, setDriveEmailInput] = useState(() => getDriveOAuthAccount(orgId) || targetAccount || '');
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [isConnectingOAuth, setIsConnectingOAuth] = useState(false);
   const [clientId, setClientId] = useState(() => getGoogleClientId());
   const [showClientIdConfig, setShowClientIdConfig] = useState(false);
 
-  // Subfolder creation state
-  const [newSubfolderName, setNewSubfolderName] = useState('');
-  const [isCreatingSubfolder, setIsCreatingSubfolder] = useState(false);
-  const [showAddSubfolderForm, setShowAddSubfolderForm] = useState(false);
+  // Sincronizar si cambia currentOrganization
+  useEffect(() => {
+    const freshEmail = currentOrganization?.driveAccount || getOrgDriveAccount(orgId) || '';
+    setOauthAccount(getDriveOAuthAccount(orgId) || freshEmail);
+    setDriveEmailInput(getDriveOAuthAccount(orgId) || freshEmail);
+  }, [currentOrganization, orgId]);
 
-  // Webhook states (Advanced)
-  const [showWebhookSection, setShowWebhookSection] = useState(false);
-  const [webhookUrl, setWebhookUrl] = useState(() => currentOrganization?.driveWebhookUrl || getOrgDriveWebhookUrl(orgId));
-  const [isEditingWebhook, setIsEditingWebhook] = useState(false);
-  const [isTestingDrive, setIsTestingDrive] = useState(false);
+  const handleSaveCustomEmail = () => {
+    const clean = driveEmailInput.trim();
+    if (!clean) {
+      onShowToast('Ingresa un correo electrónico válido');
+      return;
+    }
+    setOauthAccount(clean);
+    setOrgDriveAccount(orgId, clean);
+    if (currentOrganization && onUpdateOrganization) {
+      onUpdateOrganization({
+        ...currentOrganization,
+        driveAccount: clean
+      });
+    }
+    setIsEditingEmail(false);
+    onShowToast(`Cuenta de Google Drive configurada: ${clean}`);
+  };
 
   const handleConnectOAuth = async () => {
+    const emailToUse = driveEmailInput.trim() || oauthAccount || targetAccount;
     setIsConnectingOAuth(true);
     try {
-      const res = await connectGoogleDriveOAuth(orgId, targetAccount);
+      const res = await connectGoogleDriveOAuth(orgId, emailToUse);
       setIsConnectingOAuth(false);
       if (res.success) {
         setIsOAuthConnected(true);
-        setOauthAccount(res.email || targetAccount);
-        onShowToast(`Google Drive conectado con 1 Clic para ${res.email}`);
+        const savedEmail = res.email || emailToUse;
+        setOauthAccount(savedEmail);
+        setDriveEmailInput(savedEmail);
+        setOrgDriveAccount(orgId, savedEmail);
+        if (currentOrganization && onUpdateOrganization) {
+          onUpdateOrganization({
+            ...currentOrganization,
+            driveAccount: savedEmail
+          });
+        }
+        onShowToast(`Google Drive conectado exitosamente con ${savedEmail}`);
       } else {
         onShowToast(`No se pudo conectar: ${res.error || 'Ventana cerrada o cancelada'}`);
       }
@@ -78,7 +104,7 @@ export const GoogleDriveIntegrationTab: React.FC<GoogleDriveIntegrationTabProps>
   const handleDisconnectOAuth = () => {
     clearOAuthSession(orgId);
     setIsOAuthConnected(false);
-    onShowToast(`Google Drive desconectado para ${orgName}`);
+    onShowToast(`Google Drive desconectado para ${orgName}. Ahora puedes ingresar una cuenta diferente.`);
   };
 
   const handleSaveClientId = (e: React.FormEvent) => {
@@ -194,10 +220,49 @@ export const GoogleDriveIntegrationTab: React.FC<GoogleDriveIntegrationTabProps>
             </div>
             <div>
               <p className="text-xs font-bold text-slate-900">
-                {isOAuthConnected ? 'Cuenta Google Vinculada Activa:' : 'Conectar Google Drive con 1 Clic:'}
+                {isOAuthConnected ? 'Cuenta Google Vinculada Activa:' : 'Cuenta de Google Drive / Workspace:'}
               </p>
-              <p className="text-xs text-slate-600 font-medium">{oauthAccount}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">
+              {isEditingEmail ? (
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <input
+                    type="email"
+                    value={driveEmailInput}
+                    onChange={(e) => setDriveEmailInput(e.target.value)}
+                    placeholder="ejemplo@miinstitucion.cl o gmail.com"
+                    className="text-xs px-2.5 py-1 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium w-64 shadow-2xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveCustomEmail}
+                    className="text-xs bg-indigo-600 text-white font-bold px-3 py-1 rounded-lg hover:bg-indigo-700 cursor-pointer shadow-2xs"
+                  >
+                    Guardar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingEmail(false)}
+                    className="text-xs text-slate-500 hover:text-slate-700 px-1 py-1 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5 mt-0.5">
+                  <p className="text-xs text-slate-800 font-bold">{oauthAccount || 'Sin correo asignado'}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDriveEmailInput(oauthAccount || '');
+                      setIsEditingEmail(true);
+                    }}
+                    className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer underline flex items-center gap-0.5"
+                  >
+                    <span className="material-symbols-outlined text-[13px]">edit</span>
+                    <span>Cambiar correo</span>
+                  </button>
+                </div>
+              )}
+              <p className="text-[10px] text-slate-400 mt-1">
                 Carpeta raíz: <strong className="text-slate-600">PactaCloud - Actas Oficiales ({orgName})</strong>
               </p>
             </div>

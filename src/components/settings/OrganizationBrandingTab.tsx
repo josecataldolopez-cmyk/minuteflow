@@ -27,6 +27,7 @@ export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = (
   const [orgTaxId, setOrgTaxId] = useState(currentOrganization?.taxId || '');
   const [orgAddress, setOrgAddress] = useState(currentOrganization?.address || '');
   const [orgDomain, setOrgDomain] = useState(currentOrganization?.domain || '');
+  const [orgDriveAccount, setOrgDriveAccount] = useState(currentOrganization?.driveAccount || '');
   
   // Estados para identidad visual y membretes
   const [orgPrimaryColor, setOrgPrimaryColor] = useState(
@@ -48,6 +49,7 @@ export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = (
       setOrgTaxId(currentOrganization.taxId || '');
       setOrgAddress(currentOrganization.address || '');
       setOrgDomain(currentOrganization.domain || '');
+      setOrgDriveAccount(currentOrganization.driveAccount || '');
       setOrgPrimaryColor(currentOrganization.primaryColor || '#4f46e5');
       setOrgLogoUrl(currentOrganization.logoUrl || '');
       setOrgSlogan(currentOrganization.slogan || '');
@@ -84,6 +86,7 @@ export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = (
       taxId: orgTaxId.trim(),
       address: orgAddress.trim(),
       domain: orgDomain.trim(),
+      driveAccount: orgDriveAccount.trim(),
       primaryColor: orgPrimaryColor,
       logoUrl: finalLogo,
       slogan: orgSlogan.trim(),
@@ -217,7 +220,7 @@ export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = (
                 />
               </div>
 
-              <div className="md:col-span-2">
+              <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">
                   Dominio Web Institucional
                 </label>
@@ -226,6 +229,19 @@ export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = (
                   value={orgDomain}
                   onChange={(e) => setOrgDomain(e.target.value)}
                   placeholder="Ej. redq.cl, colegiosanignacio.cl, pactacloud.cl"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-800 shadow-2xs"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Cuenta Google Workspace / Drive Institucional
+                </label>
+                <input
+                  type="email"
+                  value={orgDriveAccount}
+                  onChange={(e) => setOrgDriveAccount(e.target.value)}
+                  placeholder="Ej. actas@miinstitucion.cl o tu.cuenta@gmail.com"
                   className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-800 shadow-2xs"
                 />
               </div>
@@ -395,6 +411,12 @@ export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = (
               <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">Recinto o Sede:</span>
               <p className="text-xs font-bold text-slate-800 truncate">{orgAddress || 'Sede Principal'}</p>
               <span className="text-[10px] text-slate-500">Ubicación para actas</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+              <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">Google Drive Asociado:</span>
+              <p className="text-xs font-bold text-slate-800 truncate">{orgDriveAccount || 'Sin vincular'}</p>
+              <span className="text-[10px] text-slate-500">Destino de actas oficiales</span>
             </div>
 
             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserProfile } from '../../types';
 import { AVATAR_PRESETS } from '../../data/mockData';
 
@@ -16,12 +16,23 @@ export const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
   compressImage
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [name, setName] = useState(userProfile.name);
-  const [role, setRole] = useState(userProfile.role);
-  const [email, setEmail] = useState(userProfile.email);
+  const [name, setName] = useState(userProfile.name || '');
+  const [role, setRole] = useState(userProfile.role || '');
+  const [email, setEmail] = useState(userProfile.email || '');
   const [department, setDepartment] = useState(userProfile.department || 'Dirección General de Operaciones');
-  const [avatarUrl, setAvatarUrl] = useState(userProfile.avatarUrl);
+  const [avatarUrl, setAvatarUrl] = useState(userProfile.avatarUrl || '');
   const [customAvatarInput, setCustomAvatarInput] = useState('');
+
+  // Sincronizar campos cuando cambie userProfile
+  useEffect(() => {
+    if (userProfile) {
+      setName(userProfile.name || '');
+      setRole(userProfile.role || '');
+      setEmail(userProfile.email || '');
+      setDepartment(userProfile.department || 'Dirección General de Operaciones');
+      setAvatarUrl(userProfile.avatarUrl || '');
+    }
+  }, [userProfile]);
 
   const handleAvatarFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -44,20 +55,24 @@ export const ProfileSettingsTab: React.FC<ProfileSettingsTabProps> = ({
       onShowToast('El nombre no puede estar vacío');
       return;
     }
+    if (!email.trim()) {
+      onShowToast('El correo electrónico no puede estar vacío');
+      return;
+    }
 
     const finalAvatar = customAvatarInput.trim() || avatarUrl;
     const updated: UserProfile = {
       ...userProfile,
       name: name.trim(),
       role: role.trim() || 'Ejecutivo',
-      email: email.trim() || userProfile.email,
+      email: email.trim(),
       department: department.trim(),
       avatarUrl: finalAvatar
     };
 
     onUpdateUserProfile(updated);
     setIsEditing(false);
-    onShowToast('Perfil de usuario actualizado exitosamente');
+    onShowToast(`Perfil actualizado con el correo ${updated.email}`);
   };
 
   return (
