@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { DirectoryItem } from '../../types';
+import { createDriveSubfolder } from '../../services/googleDriveOAuthService';
 
 interface FolderManagementTabProps {
   directories?: DirectoryItem[];
@@ -8,6 +9,7 @@ interface FolderManagementTabProps {
   onDeleteDirectory?: (id: string) => void;
   onShowToast: (msg: string) => void;
   orgName: string;
+  orgId?: string;
 }
 
 export const FolderManagementTab: React.FC<FolderManagementTabProps> = ({
@@ -16,7 +18,8 @@ export const FolderManagementTab: React.FC<FolderManagementTabProps> = ({
   onUpdateDirectory,
   onDeleteDirectory,
   onShowToast,
-  orgName
+  orgName,
+  orgId = 'org-redq'
 }) => {
   const [isAddingFolder, setIsAddingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -31,6 +34,15 @@ export const FolderManagementTab: React.FC<FolderManagementTabProps> = ({
     onCreateDirectory(clean, 'folder');
     setNewFolderName('');
     setIsAddingFolder(false);
+
+    // Si hay Webhook o Google Drive conectado, crear también la carpeta física en Drive
+    if (orgId) {
+      createDriveSubfolder(orgId, clean, orgName).then((res) => {
+        if (res.success) {
+          onShowToast(`Carpeta "${clean}" sincronizada en Google Drive`);
+        }
+      }).catch(() => {});
+    }
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {

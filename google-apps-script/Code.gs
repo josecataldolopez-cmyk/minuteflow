@@ -1,26 +1,30 @@
 /**
  * ==============================================================================
- * MINUTEFLOW - GOOGLE APPS SCRIPT WEBHOOK PARA GOOGLE DRIVE
- * Cuenta de Destino: jose.cataldo@redq.cl (o cualquier cuenta de Google)
+ * PACTACLOUD (MINUTEFLOW) - GOOGLE APPS SCRIPT WEBHOOK PARA GOOGLE DRIVE
+ * Sincronización oficial de Actas y Carpetas en Google Drive
  * ==============================================================================
  * 
- * INSTRUCCIONES DE INSTALACIÓN:
- * 1. Entra a https://script.google.com con tu cuenta (jose.cataldo@redq.cl).
- * 2. Crea un "Nuevo Proyecto" y nómbralo "MinuteFlow Drive Sync".
- * 3. Borra el código que aparezca y pega TODO este archivo.
+ * INSTRUCCIONES DE INSTALACIÓN (3 minutos):
+ * 1. Abre https://script.google.com con tu cuenta de Google del establecimiento.
+ * 2. Haz clic en "Nuevo proyecto" y nómbralo "PactaCloud Drive Sync".
+ * 3. Borra el código existente y pega TODO el contenido de este archivo.
  * 4. Haz clic en "Implementar" (arriba a la derecha) > "Nueva implementación".
- * 5. Tipo: "Aplicación web".
- * 6. Configuración:
- *    - Descripción: "MinuteFlow Webhook"
- *    - Ejecutar como: "Yo" (jose.cataldo@redq.cl)
+ * 5. Selecciona tipo: "Aplicación web".
+ * 6. Configuración obligatoria:
+ *    - Descripción: "PactaCloud Webhook"
+ *    - Ejecutar como: "Yo" (tu cuenta de Google)
  *    - Quién tiene acceso: "Cualquier usuario" (Anyone)
- * 7. Haz clic en "Implementar" y autoriza los permisos de Google Drive.
- * 8. Copia la "URL de la aplicación web" (termina en /exec) y pégala en MinuteFlow.
+ * 7. Haz clic en "Implementar", autoriza los permisos de Google Drive cuando te lo solicite.
+ * 8. Copia la "URL de la aplicación web" (termina en /exec) y pégala en PactaCloud en Configuración > Google Drive.
  */
 
 function doGet(e) {
   return ContentService.createTextOutput(
-    JSON.stringify({ status: "online", message: "MinuteFlow Google Drive Sync Activo y Conectado" })
+    JSON.stringify({
+      status: "online",
+      message: "PactaCloud Google Drive Sync Activo y Conectado",
+      timestamp: new Date().toISOString()
+    })
   ).setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -28,34 +32,66 @@ function doPost(e) {
   try {
     var rawData = e.postData ? e.postData.contents : null;
     if (!rawData) {
-      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "No data received" }))
-        .setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(
+        JSON.stringify({ status: "error", message: "No data received" })
+      ).setMimeType(ContentService.MimeType.JSON);
     }
 
     var data = JSON.parse(rawData);
-
-    // 1. Obtener o crear la carpeta principal y la subcarpeta de categoría
-    var rootFolderName = "MinuteFlow - Actas Ejecutivas";
+    var orgName = data.organizationName || "Establecimiento";
+    var rootFolderName = "PactaCloud - Actas Oficiales (" + orgName + ")";
     var rootFolder = getOrCreateFolder(DriveApp.getRootFolder(), rootFolderName);
-    
+
+    // CASO 1: Acción de creación explícita de Carpeta / Subcarpeta
+    if (data.action === "create_folder") {
+      var folderName = data.folderName || data.name || "Nueva Carpeta";
+      var createdFolder = getOrCreateFolder(rootFolder, folderName);
+      return ContentService.createTextOutput(
+        JSON.stringify({
+          status: "success",
+          message: "Carpeta '" + folderName + "' creada correctamente en Google Drive (" + rootFolderName + ")",
+          folderId: createdFolder.getId(),
+          folderUrl: createdFolder.getUrl(),
+          rootFolderUrl: rootFolder.getUrl()
+        })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // CASO 2: Prueba de Conexión
+    if (data.action === "test") {
+      return ContentService.createTextOutput(
+        JSON.stringify({
+          status: "success",
+          message: "Conexión verificada exitosamente con Google Drive. Carpeta raíz activa: " + rootFolderName,
+          folderUrl: rootFolder.getUrl(),
+          folderId: rootFolder.getId()
+        })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // CASO 3: Guardar Acta Oficial como Documento de Google
     var targetFolderName = data.directory || "Reuniones Generales";
     var targetFolder = getOrCreateFolder(rootFolder, targetFolderName);
 
-    // 2. Crear el Documento de Google con el contenido del acta
     var docTitle = (data.title || "Acta de Reunión") + " - " + (data.date || new Date().toISOString().split('T')[0]);
     var doc = DocumentApp.create(docTitle);
     var body = doc.getBody();
 
-    // Estilos y Encabezado
+    // Márgenes ejecutivos
     body.setMarginTop(54);
     body.setMarginBottom(54);
     body.setMarginLeft(54);
     body.setMarginRight(54);
 
+    // Encabezado institucional
+    var headerPar = body.appendParagraph(orgName.toUpperCase());
+    headerPar.setHeading(DocumentApp.ParagraphHeading.HEADING3);
+    headerPar.setForegroundColor("#4f46e5");
+
     // Título Principal
-    var titlePar = body.appendParagraph(data.title || "Acta de Reunión Ejecutiva");
+    var titlePar = body.appendParagraph(data.title || "Acta de Reunión Oficial");
     titlePar.setHeading(DocumentApp.ParagraphHeading.HEADING1);
-    titlePar.setForegroundColor("#1e1b4b");
+    titlePar.setForegroundColor("#0f172a");
 
     // Metadatos
     body.appendParagraph("📅 Fecha: " + (data.date || "N/A") + "   |   ⏰ Hora: " + (data.time || "10:00") + "   |   📁 Carpeta: " + targetFolderName);
@@ -73,23 +109,30 @@ function doPost(e) {
       body.appendParagraph("\n2. ASISTENTES Y PARTICIPANTES").setHeading(DocumentApp.ParagraphHeading.HEADING2);
       for (var i = 0; i < data.attendees.length; i++) {
         var att = data.attendees[i];
-        body.appendListItem(att.name + " — " + (att.role || "Miembro") + " (" + (att.email || "") + ")");
+        body.appendListItem(att.name + " — " + (att.role || "Miembro") + (att.email ? " (" + att.email + ")" : ""));
       }
     }
 
-    // Puntos Tratados y Acuerdos
-    body.appendParagraph("\n3. PUNTOS TRATADOS Y ACUERDOS ADOPTADOS").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    // Puntos Tratados
+    body.appendParagraph("\n3. PUNTOS TRATADOS Y DESARROLLO").setHeading(DocumentApp.ParagraphHeading.HEADING2);
     body.appendParagraph(data.pointsTreated || "Sin notas registradas.");
+
+    // Acuerdos y Decisiones Clave
+    if (data.keyDecisions && data.keyDecisions.length > 0) {
+      body.appendParagraph("\n4. ACUERDOS Y DECISIONES CLAVE").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+      for (var k = 0; k < data.keyDecisions.length; k++) {
+        body.appendListItem("✓ " + data.keyDecisions[k]);
+      }
+    }
 
     // Compromisos y Tareas (Action Items)
     if (data.actionItems && data.actionItems.length > 0) {
-      body.appendParagraph("\n4. COMPROMISOS Y TAREAS DERIVADAS").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+      body.appendParagraph("\n5. COMPROMISOS Y TAREAS DERIVADAS").setHeading(DocumentApp.ParagraphHeading.HEADING2);
       for (var j = 0; j < data.actionItems.length; j++) {
         var item = data.actionItems[j];
         var assigneeName = item.assignedTo ? item.assignedTo.name : "Sin asignar";
         var priorityText = item.priority === "High" ? "[Alta]" : item.priority === "Low" ? "[Baja]" : "[Media]";
         var statusText = item.completed ? "✓ COMPLETADO" : "PENDIENTE";
-        
         body.appendListItem("• " + item.text + " | Responsable: " + assigneeName + " | Vence: " + (item.dueDate || "N/A") + " " + priorityText + " (" + statusText + ")");
       }
     }
@@ -102,7 +145,7 @@ function doPost(e) {
 
     doc.saveAndClose();
 
-    // 3. Mover el archivo a la carpeta correspondiente en Google Drive
+    // Mover el archivo a la subcarpeta destino en Google Drive
     var file = DriveApp.getFileById(doc.getId());
     targetFolder.addFile(file);
     DriveApp.getRootFolder().removeFile(file);
@@ -110,10 +153,11 @@ function doPost(e) {
     return ContentService.createTextOutput(
       JSON.stringify({
         status: "success",
-        message: "Acta guardada correctamente en Google Drive",
+        message: "Acta guardada exitosamente en la carpeta '" + targetFolderName + "' de Google Drive",
         fileUrl: doc.getUrl(),
         fileId: doc.getId(),
-        folderName: targetFolderName
+        folderName: targetFolderName,
+        folderUrl: targetFolder.getUrl()
       })
     ).setMimeType(ContentService.MimeType.JSON);
 

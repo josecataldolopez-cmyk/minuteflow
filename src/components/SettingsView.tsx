@@ -224,6 +224,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               onDeleteDirectory={onDeleteDirectory}
               onShowToast={onShowToast}
               orgName={orgName}
+              orgId={currentOrganization?.id || 'org-redq'}
             />
           </ErrorBoundary>
         )}

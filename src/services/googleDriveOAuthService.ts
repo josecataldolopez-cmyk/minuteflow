@@ -217,42 +217,79 @@ export async function createDriveSubfolder(
   subfolderName: string,
   orgName: string = 'Organización'
 ): Promise<{ success: boolean; folderId?: string; folderUrl?: string; message: string }> {
-  const session = getStoredOAuthSession(orgId);
-  if (!session || !session.connected) {
-    return {
-      success: false,
-      message: 'Google Drive no está conectado. Conecta tu cuenta primero en Configuración.'
-    };
-  }
-
-  const token = session.accessToken || 'mock_oauth_token';
   const cleanSubfolder = subfolderName.trim();
   if (!cleanSubfolder) {
     return { success: false, message: 'El nombre de la subcarpeta no puede estar vacío.' };
   }
 
-  // 1. Obtener o crear carpeta raíz de la institución
-  const rootFolderName = `PactaCloud - Actas Oficiales (${orgName})`;
-  const rootFolder = await getOrCreateDriveFolder(token, rootFolderName);
-  const rootId = rootFolder?.id;
+  const session = getStoredOAuthSession(orgId);
+  const token = session?.accessToken;
+  const isRealOAuth = session?.connected && token && !token.startsWith('mock_oauth_');
 
-  // 2. Crear subcarpeta dentro de la carpeta raíz
-  const subFolder = await getOrCreateDriveFolder(token, cleanSubfolder, rootId);
+  // Caso 1: Token Real de Google OAuth 2.0
+  if (isRealOAuth && token) {
+    const rootFolderName = `PactaCloud - Actas Oficiales (${orgName})`;
+    const rootFolder = await getOrCreateDriveFolder(token, rootFolderName);
+    const rootId = rootFolder?.id;
+    const subFolder = await getOrCreateDriveFolder(token, cleanSubfolder, rootId);
 
-  if (subFolder) {
-    return {
-      success: true,
-      folderId: subFolder.id,
-      folderUrl: subFolder.url,
-      message: `Subcarpeta "${cleanSubfolder}" creada exitosamente en tu Google Drive.`
-    };
+    if (subFolder) {
+      return {
+        success: true,
+        folderId: subFolder.id,
+        folderUrl: subFolder.url,
+        message: `Subcarpeta "${cleanSubfolder}" creada exitosamente en tu Google Drive.`
+      };
+    }
   }
 
+  // Caso 2: Webhook de Google Apps Script vinculado
+  const webhookUrl = localStorage.getItem(`minuteflow_drive_webhook_${orgId}`) ||
+    localStorage.getItem('minuteflow_drive_webhook_url') ||
+    (import.meta.env.VITE_GOOGLE_DRIVE_WEBHOOK_URL as string) || '';
+
+  if (webhookUrl && webhookUrl.trim().startsWith('https://script.google.com')) {
+    try {
+      const response = await fetch(webhookUrl.trim(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        signal: AbortSignal.timeout(25000),
+        body: JSON.stringify({
+          action: 'create_folder',
+          folderName: cleanSubfolder,
+          organizationId: orgId,
+          organizationName: orgName
+        })
+      });
+
+      if (response.ok) {
+        const json = await response.json();
+        if (json.status === 'success') {
+          return {
+            success: true,
+            folderId: json.folderId,
+            folderUrl: json.folderUrl,
+            message: json.message || `Carpeta "${cleanSubfolder}" creada exitosamente en Google Drive.`
+          };
+        }
+        return {
+          success: false,
+          message: json.message || 'Error reportado por Google Apps Script.'
+        };
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error de comunicación';
+      return {
+        success: false,
+        message: `Fallo al crear la carpeta en Google Drive mediante Webhook: ${msg}`
+      };
+    }
+  }
+
+  // Si no hay OAuth real ni Webhook configurado
   return {
-    success: true,
-    folderId: `folder-${Date.now()}`,
-    folderUrl: 'https://drive.google.com/drive/u/0/my-drive',
-    message: `Subcarpeta "${cleanSubfolder}" configurada y lista para sincronización en Google Drive.`
+    success: false,
+    message: 'Para crear carpetas en tu Google Drive real, vincula tu Webhook de Google Apps Script o tu Client ID en Configuración > Google Drive.'
   };
 }
 

@@ -235,3 +235,193 @@ export async function syncMinuteToGoogleDrive(
     };
   }
 }
+
+/**
+ * Crea una carpeta física real en Google Drive mediante el Webhook de Google Apps Script.
+ */
+export async function createDriveFolderViaWebhook(
+  orgId: string,
+  folderName: string,
+  organizationName?: string
+): Promise<{ success: boolean; message: string; folderUrl?: string; folderId?: string }> {
+  const webhookUrl = getOrgDriveWebhookUrl(orgId);
+  if (!webhookUrl) {
+    return {
+      success: false,
+      message: 'No hay Webhook de Google Apps Script configurado. Configura tu Webhook en Configuración > Google Drive.'
+    };
+  }
+
+  const validation = validateDriveWebhookUrl(webhookUrl);
+  if (!validation.isValid) {
+    return {
+      success: false,
+      message: `URL de Webhook inválida: ${validation.error}`
+    };
+  }
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      signal: AbortSignal.timeout(25000),
+      body: JSON.stringify({
+        action: 'create_folder',
+        folderName: folderName.trim(),
+        organizationId: orgId,
+        organizationName: organizationName || 'Establecimiento'
+      })
+    });
+
+    if (response.ok) {
+      const json = await response.json();
+      if (json.status === 'success') {
+        return {
+          success: true,
+          message: json.message || `Carpeta "${folderName}" creada exitosamente en Google Drive.`,
+          folderUrl: json.folderUrl,
+          folderId: json.folderId
+        };
+      }
+      return {
+        success: false,
+        message: json.message || 'El Webhook reportó un error al crear la carpeta.'
+      };
+    }
+
+    return {
+      success: false,
+      message: `Google Apps Script respondió con código HTTP ${response.status}.`
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Error de red';
+    return {
+      success: false,
+      message: `No se pudo comunicar con Google Apps Script: ${msg}`
+    };
+  }
+}
+
+/**
+ * Prueba la conexión con el Webhook de Google Apps Script.
+ */
+export async function testDriveWebhook(
+  orgId: string,
+  organizationName?: string
+): Promise<{ success: boolean; message: string; folderUrl?: string }> {
+  const webhookUrl = getOrgDriveWebhookUrl(orgId);
+  if (!webhookUrl) {
+    return {
+      success: false,
+      message: 'Ingresa la URL del Webhook de Google Apps Script para probar la conexión.'
+    };
+  }
+
+  const validation = validateDriveWebhookUrl(webhookUrl);
+  if (!validation.isValid) {
+    return {
+      success: false,
+      message: validation.error || 'URL inválida'
+    };
+  }
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      signal: AbortSignal.timeout(20000),
+      body: JSON.stringify({
+        action: 'test',
+        organizationId: orgId,
+        organizationName: organizationName || 'Establecimiento'
+      })
+    });
+
+    if (response.ok) {
+      const json = await response.json();
+      if (json.status === 'success') {
+        return {
+          success: true,
+          message: json.message || 'Conexión exitosa y verificada con Google Drive.',
+          folderUrl: json.folderUrl
+        };
+      }
+      return {
+        success: false,
+        message: json.message || 'El Webhook no confirmó la conexión.'
+      };
+    }
+
+    return {
+      success: false,
+      message: `El servidor de Google Apps Script respondió con error (HTTP ${response.status}).`
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Error de conexión';
+    return {
+      success: false,
+      message: `Error al conectar con el Webhook: ${msg}. Verifica que el script esté publicado con acceso "Cualquier usuario" (Anyone).`
+    };
+  }
+}
+
+export const APPS_SCRIPT_TEMPLATE = `/**
+ * PACTACLOUD - GOOGLE APPS SCRIPT WEBHOOK PARA GOOGLE DRIVE
+ * 1. Entra a https://script.google.com con tu cuenta del colegio/institución.
+ * 2. Nuevo proyecto > Pega este código.
+ * 3. Implementar > Nueva implementación > Tipo: "Aplicación web".
+ * 4. Ejecutar como: "Yo" | Quién tiene acceso: "Cualquier usuario" (Anyone).
+ * 5. Copia la URL (termina en /exec) y pégala en PactaCloud.
+ */
+
+function doGet(e) {
+  return ContentService.createTextOutput(
+    JSON.stringify({ status: "online", message: "PactaCloud Drive Sync Activo" })
+  ).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  try {
+    var raw = e.postData ? e.postData.contents : null;
+    if (!raw) return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Sin datos" })).setMimeType(ContentService.MimeType.JSON);
+    var data = JSON.parse(raw);
+    var orgName = data.organizationName || "Establecimiento";
+    var rootFolderName = "PactaCloud - Actas Oficiales (" + orgName + ")";
+    var rootFolder = getOrCreateFolder(DriveApp.getRootFolder(), rootFolderName);
+
+    if (data.action === "create_folder") {
+      var folderName = data.folderName || "Nueva Carpeta";
+      var created = getOrCreateFolder(rootFolder, folderName);
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Carpeta '" + folderName + "' creada en Google Drive", folderUrl: created.getUrl(), folderId: created.getId() })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === "test") {
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Conexión exitosa con Google Drive. Carpeta: " + rootFolderName, folderUrl: rootFolder.getUrl() })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var targetFolder = getOrCreateFolder(rootFolder, data.directory || "Reuniones Generales");
+    var doc = DocumentApp.create((data.title || "Acta de Reunión") + " - " + (data.date || new Date().toISOString().split('T')[0]));
+    var body = doc.getBody();
+    body.setMarginTop(54).setMarginBottom(54).setMarginLeft(54).setMarginRight(54);
+    body.appendParagraph(orgName.toUpperCase()).setHeading(DocumentApp.ParagraphHeading.HEADING3).setForegroundColor("#4f46e5");
+    body.appendParagraph(data.title || "Acta de Reunión Oficial").setHeading(DocumentApp.ParagraphHeading.HEADING1);
+    body.appendParagraph("📅 Fecha: " + (data.date || "N/A") + " | 📁 Carpeta: " + (data.directory || "General"));
+    body.appendHorizontalRule();
+    if (data.objectives) { body.appendParagraph("\\n1. OBJETIVOS").setHeading(DocumentApp.ParagraphHeading.HEADING2); body.appendParagraph(data.objectives); }
+    body.appendParagraph("\\n2. DESARROLLO Y ACUERDOS").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    body.appendParagraph(data.pointsTreated || "Sin notas.");
+    doc.saveAndClose();
+    var file = DriveApp.getFileById(doc.getId());
+    targetFolder.addFile(file);
+    DriveApp.getRootFolder().removeFile(file);
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Acta guardada en Google Drive", fileUrl: doc.getUrl(), folderUrl: targetFolder.getUrl() })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function getOrCreateFolder(parent, name) {
+  var it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : parent.createFolder(name);
+}`;
+
