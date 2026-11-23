@@ -62,6 +62,8 @@ interface SettingsViewProps {
   currentOrganization?: Organization;
   onUpdateOrganization?: (updatedOrg: Organization) => void;
   userRole?: UserRole;
+  hasMultipleOrgs?: boolean;
+  onPurgeDemoOrganizations?: () => void;
 }
 
 type SettingsTab = 'all' | 'branding' | 'profile' | 'drive' | 'directory' | 'folders' | 'data';
@@ -85,7 +87,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onResetSampleMinutes,
   currentOrganization,
   onUpdateOrganization,
-  userRole = 'admin'
+  userRole = 'admin',
+  hasMultipleOrgs = false,
+  onPurgeDemoOrganizations
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('all');
   const orgName = currentOrganization?.name || 'Establecimiento Principal';
@@ -196,6 +200,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             onShowToast={onShowToast}
             isAdmin={isAdmin}
             compressImage={compressImage}
+            hasMultipleOrgs={hasMultipleOrgs}
+            onPurgeDemoOrganizations={onPurgeDemoOrganizations}
           />
         )}
 

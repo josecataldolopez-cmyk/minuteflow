@@ -8,6 +8,8 @@ interface OrganizationBrandingTabProps {
   onShowToast: (msg: string) => void;
   isAdmin: boolean;
   compressImage: (file: File, maxDim?: number) => Promise<string>;
+  hasMultipleOrgs?: boolean;
+  onPurgeDemoOrganizations?: () => void;
 }
 
 export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = ({
@@ -15,7 +17,9 @@ export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = (
   onUpdateOrganization,
   onShowToast,
   isAdmin,
-  compressImage
+  compressImage,
+  hasMultipleOrgs = false,
+  onPurgeDemoOrganizations
 }) => {
   // Estados para datos institucionales / recinto
   const [orgName, setOrgName] = useState(currentOrganization?.name || 'Establecimiento Principal');
@@ -412,6 +416,33 @@ export const OrganizationBrandingTab: React.FC<OrganizationBrandingTabProps> = (
               <p className="text-xs font-bold text-slate-800 truncate">{orgHeaderText || 'DOCUMENTO OFICIAL'}</p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Banner de Aislamiento Exclusivo si aún existen organizaciones demo */}
+      {hasMultipleOrgs && onPurgeDemoOrganizations && isAdmin && (
+        <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-amber-600 text-[22px] shrink-0 mt-0.5" aria-hidden="true">
+              security
+            </span>
+            <div>
+              <h4 className="text-xs font-bold text-amber-950">
+                Aislar cuenta: Conservar únicamente mi establecimiento
+              </h4>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                Actualmente tu sesión tiene cargados otros establecimientos de demostración inicial. Al pulsar este botón se eliminarán todas las organizaciones de prueba, dejando tu cuenta vinculada de forma exclusiva a <strong>{orgName}</strong>.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onPurgeDemoOrganizations}
+            className="text-xs font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300 border border-amber-300 px-4 py-2 rounded-xl transition-colors cursor-pointer shrink-0 self-start sm:self-auto shadow-2xs flex items-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">delete_sweep</span>
+            <span>Eliminar Establecimientos Demo</span>
+          </button>
         </div>
       )}
     </div>

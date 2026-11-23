@@ -214,6 +214,34 @@ export default function App() {
     }
   };
 
+  // Purgar organizaciones de prueba para dejar únicamente el establecimiento activo del usuario
+  const handlePurgeDemoOrganizations = () => {
+    const kept = organizations.filter((o) => o.id === currentOrgId);
+    setOrganizations(kept);
+    localStorage.setItem('minuteflow_organizations', JSON.stringify(kept));
+    setMinutes((prev) => {
+      const filtered = prev.filter((m) => (m.organizationId || 'org-redq') === currentOrgId);
+      localStorage.setItem('minuteflow_minutes', JSON.stringify(filtered));
+      return filtered;
+    });
+    setActionItems((prev) => {
+      const filtered = prev.filter((a) => (a.organizationId || 'org-redq') === currentOrgId);
+      localStorage.setItem('minuteflow_action_items', JSON.stringify(filtered));
+      return filtered;
+    });
+    setDirectories((prev) => {
+      const filtered = prev.filter((d) => (d.organizationId || 'org-redq') === currentOrgId);
+      localStorage.setItem('minuteflow_directories', JSON.stringify(filtered));
+      return filtered;
+    });
+    setAllAttendees((prev) => {
+      const filtered = prev.filter((a) => (a.organizationId || 'org-redq') === currentOrgId);
+      localStorage.setItem('minuteflow_attendees', JSON.stringify(filtered));
+      return filtered;
+    });
+    showToast(`Se han eliminado los demás establecimientos de prueba. Tu cuenta ahora contiene exclusivamente "${currentOrganization.name}".`);
+  };
+
   // Strict Scoped Multi-Tenant Filtering:
   // Garantiza que ningún usuario de una organización acceda a actas, carpetas ni miembros de otra.
   const scopedMinutes = useMemo(() => {
@@ -583,6 +611,8 @@ export default function App() {
             currentOrganization={currentOrganization}
             onUpdateOrganization={handleUpdateOrganization}
             userRole={userProfile.systemRole}
+            hasMultipleOrgs={organizations.length > 1}
+            onPurgeDemoOrganizations={handlePurgeDemoOrganizations}
           />
         )}
 

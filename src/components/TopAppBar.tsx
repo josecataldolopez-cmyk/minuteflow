@@ -99,39 +99,66 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
         {/* Multi-Tenant Organization Switcher */}
         {activeOrg && (
           <div ref={orgRef} className="relative">
-            <button
-              onClick={() => setShowOrgSelector(!showOrgSelector)}
-              title="Cambiar de Establecimiento / Organización"
-              className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:border-indigo-400 bg-slate-50 hover:bg-white transition-all cursor-pointer group"
-            >
-              <div
-                className="w-7 h-7 rounded-lg text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs overflow-hidden"
-                style={{ backgroundColor: activeOrg.primaryColor || '#4f46e5' }}
+            {userSystemRole === 'superadmin' ? (
+              <button
+                onClick={() => setShowOrgSelector(!showOrgSelector)}
+                title="Cambiar de Establecimiento (Solo SuperAdmin de Plataforma)"
+                className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:border-indigo-400 bg-slate-50 hover:bg-white transition-all cursor-pointer group"
               >
-                {activeOrg.logoUrl ? (
-                  <img src={activeOrg.logoUrl} alt={activeOrg.name} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="material-symbols-outlined text-[17px]">domain</span>
-                )}
-              </div>
-              <div className="text-left hidden sm:block">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors truncate max-w-[170px]">
+                <div
+                  className="w-7 h-7 rounded-lg text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs overflow-hidden"
+                  style={{ backgroundColor: activeOrg.primaryColor || '#4f46e5' }}
+                >
+                  {activeOrg.logoUrl ? (
+                    <img src={activeOrg.logoUrl} alt={activeOrg.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="material-symbols-outlined text-[17px]">domain</span>
+                  )}
+                </div>
+                <div className="text-left hidden sm:block">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors truncate max-w-[170px]">
+                      {activeOrg.name}
+                    </span>
+                    <span className="material-symbols-outlined text-[15px] text-slate-400 group-hover:text-indigo-600">
+                      expand_more
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-purple-500" />
+                    <span>Panel SuperAdmin</span>
+                  </div>
+                </div>
+              </button>
+            ) : (
+              <div
+                title={`Espacio Institucional: ${activeOrg.name}`}
+                className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-slate-200/90 bg-white/90 shadow-2xs"
+              >
+                <div
+                  className="w-7 h-7 rounded-lg text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs overflow-hidden"
+                  style={{ backgroundColor: activeOrg.primaryColor || '#4f46e5' }}
+                >
+                  {activeOrg.logoUrl ? (
+                    <img src={activeOrg.logoUrl} alt={activeOrg.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="material-symbols-outlined text-[17px]">domain</span>
+                  )}
+                </div>
+                <div className="text-left hidden sm:block">
+                  <span className="text-xs font-bold text-slate-900 truncate max-w-[170px] block">
                     {activeOrg.name}
                   </span>
-                  <span className="material-symbols-outlined text-[15px] text-slate-400 group-hover:text-indigo-600">
-                    expand_more
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span>Espacio Privado • ID: {activeOrg.code}</span>
+                  <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span>Mi Establecimiento • ID: {activeOrg.code}</span>
+                  </div>
                 </div>
               </div>
-            </button>
+            )}
 
-            {/* Organizations Dropdown */}
-            {showOrgSelector && (
+            {/* Organizations Dropdown - Exclusivo para SuperAdmin de Plataforma */}
+            {showOrgSelector && userSystemRole === 'superadmin' && (
               <div className="absolute left-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 p-3 z-50 animate-in fade-in">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
