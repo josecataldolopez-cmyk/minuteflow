@@ -539,8 +539,8 @@ export const GoogleDriveIntegrationTab: React.FC<GoogleDriveIntegrationTabProps>
         </div>
       </div>
 
-      {/* Configuración Avanzada de Client ID */}
-      <div className="pt-1">
+      {/* Configuración Avanzada de Client ID & Verificación OAuth */}
+      <div className="pt-1 space-y-3">
         <button
           type="button"
           onClick={() => setShowClientIdConfig(!showClientIdConfig)}
@@ -549,28 +549,72 @@ export const GoogleDriveIntegrationTab: React.FC<GoogleDriveIntegrationTabProps>
           <span className="material-symbols-outlined text-[14px]">
             {showClientIdConfig ? 'expand_less' : 'tune'}
           </span>
-          <span>{showClientIdConfig ? 'Ocultar Google Client ID' : 'Configurar Client ID de Google Cloud (Avanzado)'}</span>
+          <span>{showClientIdConfig ? 'Ocultar Google Client ID y Verificación' : 'Configurar Client ID de Google Cloud & Verificación OAuth (Avanzado)'}</span>
         </button>
 
         {showClientIdConfig && (
-          <form onSubmit={handleSaveClientId} className="mt-2 p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-            <label className="text-[11px] font-bold text-slate-700 block">Google Cloud OAuth 2.0 Client ID:</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                placeholder="123456789-xxxx.apps.googleusercontent.com"
-                className="flex-1 text-xs px-3 py-1.5 rounded-xl border border-slate-200 bg-white font-mono text-[11px]"
-              />
-              <button
-                type="submit"
-                className="px-3 py-1.5 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-xl cursor-pointer"
-              >
-                Guardar ID
-              </button>
+          <div className="space-y-3 animate-in fade-in">
+            <form onSubmit={handleSaveClientId} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+              <label className="text-[11px] font-bold text-slate-700 block">Google Cloud OAuth 2.0 Client ID:</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                  placeholder="123456789-xxxx.apps.googleusercontent.com"
+                  className="flex-1 text-xs px-3 py-1.5 rounded-xl border border-slate-200 bg-white font-mono text-[11px]"
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-xl cursor-pointer"
+                >
+                  Guardar ID
+                </button>
+              </div>
+            </form>
+
+            {/* Banner de Verificación Google Cloud para levantar límite de 100 usuarios */}
+            <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2 text-xs">
+              <div className="flex items-center gap-2 text-emerald-900 font-bold">
+                <span className="material-symbols-outlined text-[18px] text-emerald-600">verified</span>
+                <span>¿Cómo publicar la app en Google Cloud y quitar el límite de 100 usuarios?</span>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                En tu consola de <strong>Google Cloud &gt; Pantalla de consentimiento de OAuth</strong>, puedes cambiar el estado a <strong>"Publicar aplicación" (En Producción)</strong> para que cualquier usuario de tu establecimiento ingrese sin limitaciones. Pega estas URLs oficiales verificadas:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 font-mono text-[11px]">
+                <div className="bg-white p-2 rounded-lg border border-emerald-200 flex items-center justify-between">
+                  <span className="text-slate-600 truncate">Política de Privacidad:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText('https://pactacloud.vercel.app/privacy');
+                      onShowToast('URL de Privacidad copiada al portapapeles');
+                    }}
+                    className="ml-2 text-indigo-600 font-bold hover:underline shrink-0"
+                  >
+                    Copiar URL
+                  </button>
+                </div>
+                <div className="bg-white p-2 rounded-lg border border-emerald-200 flex items-center justify-between">
+                  <span className="text-slate-600 truncate">Términos de Servicio:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText('https://pactacloud.vercel.app/terms');
+                      onShowToast('URL de Términos copiada al portapapeles');
+                    }}
+                    className="ml-2 text-indigo-600 font-bold hover:underline shrink-0"
+                  >
+                    Copiar URL
+                  </button>
+                </div>
+              </div>
+              <p className="text-[10px] text-emerald-800 italic">
+                * Alcance utilizado: <code>drive.file</code> (Alcance no restringido, no requiere auditoría de seguridad de pago CASA).
+              </p>
             </div>
-          </form>
+          </div>
         )}
       </div>
     </div>

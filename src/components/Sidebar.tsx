@@ -8,6 +8,7 @@ interface SidebarProps {
   isSyncing: boolean;
   onTriggerSync: () => void;
   currentOrganization?: Organization;
+  onOpenPrivacy?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -16,7 +17,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNewMinute,
   isSyncing,
   onTriggerSync,
-  currentOrganization
+  currentOrganization,
+  onOpenPrivacy
 }) => {
   const primaryColor = currentOrganization?.primaryColor || '#4f46e5';
   const orgLogo = currentOrganization?.logoUrl;
@@ -172,6 +174,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {isSyncing ? 'Sincronizando...' : 'En vivo'}
           </span>
         </button>
+
+        {/* Privacy & Legal Links */}
+        <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between px-2 text-[11px] text-slate-400">
+          <button
+            onClick={onOpenPrivacy}
+            className="hover:text-indigo-600 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+            title="Ver Política de Privacidad y Términos"
+          >
+            <span className="material-symbols-outlined text-[13px]">shield</span>
+            <span>Privacidad & Términos</span>
+          </button>
+          <a
+            href="/privacy.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-indigo-600 transition-colors"
+            title="Abrir página pública oficial"
+          >
+            <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+          </a>
+        </div>
       </div>
     </aside>
   );

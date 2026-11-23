@@ -6,6 +6,7 @@ import { LibraryView } from './components/LibraryView';
 import { MinuteEditorView } from './components/MinuteEditorView';
 import { ExportShareModal } from './components/ExportShareModal';
 import { SettingsView } from './components/SettingsView';
+import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Toast } from './components/Toast';
 import { storageService } from './services/storageService';
@@ -72,6 +73,28 @@ export default function App() {
 
   // Navigation State
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
+
+  // Privacy & Terms Compliance Modal
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+  const [privacyModalTab, setPrivacyModalTab] = useState<'privacy' | 'terms'>('privacy');
+
+  // Listen to URL hash (#privacy or #terms) for direct deep linking
+  useEffect(() => {
+    const handleHashCheck = () => {
+      const hash = window.location.hash.toLowerCase();
+      if (hash === '#privacy' || hash === '#privacidad') {
+        setPrivacyModalTab('privacy');
+        setIsPrivacyModalOpen(true);
+      } else if (hash === '#terms' || hash === '#terminos') {
+        setPrivacyModalTab('terms');
+        setIsPrivacyModalOpen(true);
+      }
+    };
+
+    handleHashCheck();
+    window.addEventListener('hashchange', handleHashCheck);
+    return () => window.removeEventListener('hashchange', handleHashCheck);
+  }, []);
 
   // Organizations (Tenants) State
   const [organizations, setOrganizations] = useState<Organization[]>(() => {
@@ -540,6 +563,10 @@ export default function App() {
         isSyncing={isSyncing}
         onTriggerSync={handleTriggerSync}
         currentOrganization={currentOrganization}
+        onOpenPrivacy={() => {
+          setPrivacyModalTab('privacy');
+          setIsPrivacyModalOpen(true);
+        }}
       />
 
       {/* Main Content Area */}
@@ -715,6 +742,18 @@ export default function App() {
         currentOrganization={currentOrganization}
         directories={scopedDirectories}
         onCreateDirectory={handleCreateDirectory}
+      />
+
+      {/* Legal & Privacy Compliance Modal */}
+      <PrivacyPolicyModal
+        isOpen={isPrivacyModalOpen}
+        onClose={() => {
+          setIsPrivacyModalOpen(false);
+          if (window.location.hash) {
+            history.replaceState(null, '', window.location.pathname);
+          }
+        }}
+        defaultTab={privacyModalTab}
       />
 
       {/* Global Security & Toast Notification */}
