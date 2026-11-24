@@ -51,11 +51,17 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
     minute?.pointsTreated ||
       '• Se revisaron las métricas de rendimiento y objetivos estratégicos.\n• Se aprobó la reasignación de presupuesto para adquisición digital.\n• El equipo legal procederá con la redacción de contratos.'
   );
+  const getDefaultNextSessionDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split('T')[0];
+  };
+
   const [attendees, setAttendees] = useState<Attendee[]>(
     minute?.attendees || (allAttendees.length >= 2 ? [allAttendees[0], allAttendees[1]] : allAttendees)
   );
   const [nextSessionDate, setNextSessionDate] = useState(
-    minute?.nextSessionDate || '2026-11-15'
+    minute?.nextSessionDate || getDefaultNextSessionDate()
   );
   const [syncCalendar, setSyncCalendar] = useState(
     minute?.syncCalendar !== undefined ? minute.syncCalendar : true
@@ -747,14 +753,14 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
                       };
                       openGoogleCalendarEvent(tempMinute, currentOrganization?.name);
                     }}
-                    className="w-full py-2 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-indigo-200/60 shadow-2xs"
+                    className="w-full py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
                   >
-                    <span className="material-symbols-outlined text-[17px]">calendar_today</span>
-                    <span>Abrir y Agendar en Calendar</span>
+                    <span className="material-symbols-outlined text-[17px]">calendar_month</span>
+                    <span>Abrir y Agendar en Google Calendar</span>
                     <span className="material-symbols-outlined text-[13px]">open_in_new</span>
                   </button>
-                  <p className="text-[10px] text-slate-400 text-center">
-                    Precarga título, fecha, hora y correos de los asistentes
+                  <p className="text-[10px] text-slate-500 text-center leading-tight">
+                    Abre Google Calendar e invita automáticamente a {attendees.filter(a => a.email && a.email.includes('@')).length} asistentes
                   </p>
                 </div>
               )}

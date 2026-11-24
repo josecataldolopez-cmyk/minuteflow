@@ -12,7 +12,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Toast } from './components/Toast';
 import { storageService } from './services/storageService';
 import { getSupabase, isSupabaseConfigured } from './services/supabaseClient';
-import { openGoogleCalendarEvent } from './services/calendarService';
+import { openGoogleCalendarEvent, downloadIcsFile } from './services/calendarService';
 import {
   MeetingMinute,
   ViewMode,
@@ -112,6 +112,7 @@ export default function App() {
   // Supabase Auth State (Fase 1: Identidad & Tenancy Real)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [scheduledMinuteNotification, setScheduledMinuteNotification] = useState<MeetingMinute | null>(null);
 
   // Monitor Supabase Authentication
   useEffect(() => {
@@ -485,6 +486,7 @@ export default function App() {
 
     // Abrir Google Calendar si el usuario activó la casilla de próxima sesión
     if (minuteWithOrg.syncCalendar && minuteWithOrg.nextSessionDate) {
+      setScheduledMinuteNotification(minuteWithOrg);
       try {
         openGoogleCalendarEvent(minuteWithOrg, currentOrganization.name);
       } catch {
@@ -875,6 +877,58 @@ export default function App() {
         }}
         defaultTab={privacyModalTab}
       />
+
+      {/* Floating Google Calendar Notification Banner */}
+      {scheduledMinuteNotification && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full bg-slate-900 text-white rounded-2xl p-4 shadow-2xl border border-slate-700 animate-in slide-in-from-bottom-5">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-amber-400 text-[22px]">calendar_month</span>
+              <h4 className="text-sm font-bold text-white">Próxima Sesión Programada</h4>
+            </div>
+            <button
+              type="button"
+              onClick={() => setScheduledMinuteNotification(null)}
+              className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+          </div>
+          <p className="text-xs text-slate-300 mb-3 truncate">
+            {scheduledMinuteNotification.title}
+          </p>
+          <div className="bg-slate-800/80 rounded-lg p-2 mb-3 text-[11px] text-slate-300 flex items-center justify-between border border-slate-700">
+            <span>Fecha: <strong className="text-white">{scheduledMinuteNotification.nextSessionDate}</strong></span>
+            <span>Hora: <strong className="text-white">{scheduledMinuteNotification.time || '10:00'} hrs</strong></span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                openGoogleCalendarEvent(scheduledMinuteNotification, currentOrganization.name);
+                setScheduledMinuteNotification(null);
+              }}
+              className="flex-1 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-all"
+            >
+              <span className="material-symbols-outlined text-[16px]">calendar_month</span>
+              <span>Abrir en Google Calendar</span>
+              <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                downloadIcsFile(scheduledMinuteNotification, currentOrganization.name);
+                setScheduledMinuteNotification(null);
+              }}
+              className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all border border-slate-700"
+              title="Descargar archivo .ics"
+            >
+              <span className="material-symbols-outlined text-[16px]">download</span>
+              <span>.ics</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Global Security & Toast Notification */}
       <Toast message={toastMessage} onClose={() => setToastMessage(null)} />

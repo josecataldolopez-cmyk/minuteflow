@@ -11,6 +11,11 @@ import {
   connectGoogleDriveOAuth,
   createDriveSubfolder
 } from '../services/googleDriveOAuthService';
+import {
+  openGoogleCalendarEvent,
+  downloadIcsFile,
+  generateGoogleCalendarUrl
+} from '../services/calendarService';
 
 interface ExportShareModalProps {
   minute: MeetingMinute | null;
@@ -31,7 +36,7 @@ export const ExportShareModal: React.FC<ExportShareModalProps> = ({
   directories = [],
   onCreateDirectory
 }) => {
-  const [selectedChannel, setSelectedChannel] = useState<'drive' | 'whatsapp' | 'email'>('drive');
+  const [selectedChannel, setSelectedChannel] = useState<'drive' | 'whatsapp' | 'email' | 'calendar'>('drive');
   const [previewTab, setPreviewTab] = useState<'whatsapp' | 'email'>('whatsapp');
   const [isExporting, setIsExporting] = useState(false);
   const [exportResult, setExportResult] = useState<{ success: boolean; message: string; fileUrl?: string } | null>(null);
@@ -119,6 +124,11 @@ export const ExportShareModal: React.FC<ExportShareModalProps> = ({
           fileUrl: undefined
         });
       }
+    } else if (selectedChannel === 'calendar') {
+      setIsExporting(false);
+      openGoogleCalendarEvent(minute, orgName);
+      onExportSuccess('Google Calendar');
+      onClose();
     } else {
       setTimeout(() => {
         setIsExporting(false);
@@ -328,6 +338,37 @@ Dirección de ${orgName}`;
                 Distribución formal por email a todos los asistentes ({minute.attendees.length} destinatarios).
               </p>
             </div>
+
+            {/* Google Calendar Option */}
+            <div
+              onClick={() => setSelectedChannel('calendar')}
+              className={`bg-white rounded-2xl border p-4 relative overflow-hidden cursor-pointer transition-all ${
+                selectedChannel === 'calendar'
+                  ? 'border-amber-500 ring-2 ring-amber-100 shadow-sm'
+                  : 'border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <div className="flex justify-between items-start mb-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+                    <span className="material-symbols-outlined text-[18px]">calendar_month</span>
+                  </div>
+                  <h3 className="text-xs font-bold text-slate-900">Google Calendar & iCal</h3>
+                </div>
+                <span
+                  className={`material-symbols-outlined text-[18px] ${
+                    selectedChannel === 'calendar'
+                      ? 'text-amber-500 material-symbols-fill'
+                      : 'text-slate-300'
+                  }`}
+                >
+                  {selectedChannel === 'calendar' ? 'check_circle' : 'radio_button_unchecked'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Agendar próxima sesión ({minute.nextSessionDate || minute.date}) e invitar automáticamente a los asistentes.
+              </p>
+            </div>
           </div>
 
           {/* Right Column: Dynamic Preview & Sync Configuration (Span 7) */}
@@ -508,6 +549,88 @@ Dirección de ${orgName}`;
                   )}
                 </div>
               </div>
+            ) : selectedChannel === 'calendar' ? (
+              /* Calendar Preview and Action */
+              <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200/80 flex flex-col gap-4 h-full">
+                <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[20px] text-amber-600">event_available</span>
+                    <h4 className="text-xs font-bold text-slate-900">
+                      Google Calendar e iCal ({orgName})
+                    </h4>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                    {minute.nextSessionDate ? 'Próxima Sesión Definida' : 'Fecha de Acta'}
+                  </span>
+                </div>
+
+                <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3 shadow-2xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Evento a Programar</span>
+                    <h3 className="text-sm font-bold text-slate-900 pt-0.5">
+                      Próxima Sesión: {minute.title} ({orgName})
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-100">
+                      <span className="text-[10px] text-slate-400 block font-medium">Fecha</span>
+                      <strong className="text-slate-800 text-xs">{minute.nextSessionDate || minute.date}</strong>
+                    </div>
+                    <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-100">
+                      <span className="text-[10px] text-slate-400 block font-medium">Hora de inicio</span>
+                      <strong className="text-slate-800 text-xs">{minute.time || '10:00'} hrs</strong>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                      Invitaciones automáticas ({minute.attendees.filter(a => a.email && a.email.includes('@')).length} correos listos)
+                    </span>
+                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto custom-scrollbar">
+                      {minute.attendees.map(a => (
+                        <span
+                          key={a.id}
+                          className={`text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 border ${
+                            a.email && a.email.includes('@')
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              : 'bg-slate-100 text-slate-500 border-slate-200'
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[10px]">
+                            {a.email && a.email.includes('@') ? 'mail' : 'person'}
+                          </span>
+                          <span className="truncate max-w-[130px]">{a.name}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Direct Action Buttons */}
+                <div className="flex flex-col gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      openGoogleCalendarEvent(minute, orgName);
+                    }}
+                    className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">calendar_month</span>
+                    <span>Abrir y Agendar en Google Calendar</span>
+                    <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => downloadIcsFile(minute, orgName)}
+                    className="w-full py-2 px-4 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-slate-500">download</span>
+                    <span>Descargar archivo .ics (Outlook, Apple, Google)</span>
+                  </button>
+                </div>
+              </div>
             ) : (
               /* Message Preview for WhatsApp or Email */
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 flex flex-col h-full">
@@ -569,16 +692,28 @@ Dirección de ${orgName}`;
             <button
               onClick={handleExport}
               disabled={isExporting}
-              className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-100 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className={`px-5 py-2 text-xs font-bold text-white rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                selectedChannel === 'calendar'
+                  ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-100'
+                  : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'
+              }`}
             >
               <span className={`material-symbols-outlined text-[16px] ${isExporting ? 'animate-spin' : ''}`}>
-                {isExporting ? 'progress_activity' : selectedChannel === 'drive' ? 'cloud_upload' : 'send'}
+                {isExporting
+                  ? 'progress_activity'
+                  : selectedChannel === 'drive'
+                  ? 'cloud_upload'
+                  : selectedChannel === 'calendar'
+                  ? 'calendar_month'
+                  : 'send'}
               </span>
               <span>
                 {isExporting
                   ? 'Guardando...'
                   : selectedChannel === 'drive'
                   ? `Guardar en Drive de ${orgName}`
+                  : selectedChannel === 'calendar'
+                  ? 'Abrir en Google Calendar'
                   : 'Enviar Notificación'}
               </span>
             </button>

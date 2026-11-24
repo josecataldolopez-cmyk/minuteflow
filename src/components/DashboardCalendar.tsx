@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ActionItem, ScheduleItem, MeetingMinute, Attendee } from '../types';
+import { openGoogleCalendarEvent } from '../services/calendarService';
 
 interface DashboardCalendarProps {
   actionItems: ActionItem[];
@@ -517,6 +518,22 @@ export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
 
                       {/* Items Preview Chips (Max 2 displayed) */}
                       <div className="space-y-1 overflow-hidden flex-1">
+                        {/* Next Sessions from Minutes */}
+                        {dayNextSessions.slice(0, 1).map((min) => (
+                          <div
+                            key={`next-${min.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectMinute(min);
+                            }}
+                            className="text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-200/80 rounded px-1.5 py-0.5 truncate flex items-center gap-1 shadow-2xs hover:bg-amber-100"
+                            title={`Próxima Sesión: ${min.title}`}
+                          >
+                            <span className="material-symbols-outlined text-[11px] text-amber-600">event_repeat</span>
+                            <span className="truncate">{min.title}</span>
+                          </div>
+                        ))}
+
                         {/* Meetings */}
                         {daySchedules.slice(0, 1).map((sch) => (
                           <div
@@ -579,6 +596,7 @@ export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
                   const dayData = itemsByDate[d.dateStr];
                   const dayActions = dayData?.actions || [];
                   const daySchedules = dayData?.schedules || [];
+                  const dayNextSessions = dayData?.nextSessions || [];
 
                   return (
                     <div
@@ -598,6 +616,21 @@ export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
                       </div>
 
                       <div className="space-y-1.5 flex-1 overflow-y-auto">
+                        {dayNextSessions.map((min) => (
+                          <div
+                            key={`next-wk-${min.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectMinute(min);
+                            }}
+                            className="text-[11px] p-1.5 rounded-lg bg-amber-50 text-amber-900 border border-amber-200/80 font-bold flex items-center gap-1 shadow-2xs hover:bg-amber-100"
+                            title={`Próxima Sesión: ${min.title}`}
+                          >
+                            <span className="material-symbols-outlined text-[13px] text-amber-600">event_repeat</span>
+                            <span className="truncate">{min.title}</span>
+                          </div>
+                        ))}
+
                         {daySchedules.map((s) => (
                           <div
                             key={s.id}
@@ -940,20 +973,31 @@ export const DashboardCalendar: React.FC<DashboardCalendarProps> = ({
 
             {/* Next Sessions / Seguimiento */}
             {selectedDayData.nextSessions.length > 0 && (
-              <div className="p-3 bg-indigo-50/70 rounded-xl border border-indigo-100 text-xs">
-                <span className="font-bold text-indigo-900 flex items-center gap-1 mb-1">
-                  <span className="material-symbols-outlined text-[16px] text-indigo-600">
+              <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200/80 text-xs space-y-2">
+                <span className="font-bold text-amber-950 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[17px] text-amber-600">
                     event_repeat
                   </span>
                   Próxima Sesión Programada
                 </span>
                 {selectedDayData.nextSessions.map((min) => (
-                  <div
-                    key={min.id}
-                    onClick={() => onSelectMinute(min)}
-                    className="text-indigo-800 hover:text-indigo-900 font-semibold cursor-pointer underline truncate"
-                  >
-                    {min.title}
+                  <div key={min.id} className="space-y-1.5 pt-1 border-t border-amber-200/60">
+                    <div
+                      onClick={() => onSelectMinute(min)}
+                      className="text-amber-900 hover:text-amber-950 font-bold cursor-pointer underline truncate"
+                      title="Ver acta de esta sesión"
+                    >
+                      {min.title}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openGoogleCalendarEvent(min)}
+                      className="w-full py-1.5 px-3 rounded-lg bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 font-bold text-[11px] flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[14px] text-amber-700">calendar_month</span>
+                      <span>Agendar en Google Calendar</span>
+                      <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+                    </button>
                   </div>
                 ))}
               </div>

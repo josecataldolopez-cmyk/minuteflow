@@ -7,24 +7,48 @@ import { MeetingMinute } from '../types';
 /**
  * Convierte fecha (YYYY-MM-DD) y hora (HH:mm) al formato YYYYMMDDTHHmm00 para Google Calendar
  */
-function formatToCalendarDateTime(dateStr: string, timeStr: string = '10:00', addHours: number = 0): string {
-  const [year, month, day] = dateStr.split('-');
-  const [hoursStr, minutesStr] = (timeStr || '10:00').split(':');
+export function formatToCalendarDateTime(dateStr?: string, timeStr: string = '10:00', addHours: number = 0): string {
+  let d = new Date();
+  if (dateStr && dateStr.trim()) {
+    const parts = dateStr.split(/[-/]/);
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      if (!isNaN(y) && !isNaN(m) && !isNaN(day)) {
+        d = new Date(y, m, day);
+      }
+    }
+  }
 
-  let hours = parseInt(hoursStr, 10) + addHours;
-  const minutes = minutesStr || '00';
+  let hours = 10;
+  let minutes = 0;
+  if (timeStr && timeStr.includes(':')) {
+    const [h, min] = timeStr.split(':');
+    const parsedH = parseInt(h, 10);
+    const parsedM = parseInt(min, 10);
+    if (!isNaN(parsedH)) hours = parsedH;
+    if (!isNaN(parsedM)) minutes = parsedM;
+  }
 
-  if (isNaN(hours)) hours = 10 + addHours;
+  hours += addHours;
+  d.setHours(hours, minutes, 0, 0);
 
   const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  return `${year}${month}${day}T${pad(hours)}${minutes}00`;
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const min = pad(d.getMinutes());
+
+  return `${yyyy}${mm}${dd}T${hh}${min}00`;
 }
 
 /**
  * Genera la URL oficial de Google Calendar Web Intent para agendar la reunión con 1 clic
  */
 export function generateGoogleCalendarUrl(minute: MeetingMinute, organizationName?: string): string {
-  const dateToUse = minute.nextSessionDate || minute.date || new Date().toISOString().split('T')[0];
+  const dateToUse = minute.nextSessionDate || minute.date;
   const timeToUse = minute.time || '10:00';
 
   const startFormatted = formatToCalendarDateTime(dateToUse, timeToUse, 0);
@@ -35,7 +59,7 @@ export function generateGoogleCalendarUrl(minute: MeetingMinute, organizationNam
 
   // Resumen de acuerdos y objetivos para la descripción
   const decisionsSummary = minute.keyDecisions && minute.keyDecisions.length > 0
-    ? `\n\nAcuerdos y Puntos Clave:\n${minute.keyDecisions.map((d) => `• ${d}`).join('\n')}`
+    ? `\n\nAcuerdos y Compromisos:\n${minute.keyDecisions.map((d) => `• ${d}`).join('\n')}`
     : '';
 
   const details = `Convocatoria oficial gestionada en PactaCloud Suite (${org}).\n\nCarpeta: ${minute.directory}\nActa de referencia: ${minute.title}${decisionsSummary}\n\nAcceso a la plataforma: https://pactacloud.vercel.app`;
@@ -46,12 +70,11 @@ export function generateGoogleCalendarUrl(minute: MeetingMinute, organizationNam
     .filter((email): email is string => Boolean(email && email.includes('@')))
     .join(',');
 
-  const params = new URLSearchParams({
-    action: 'TEMPLATE',
-    text: eventTitle,
-    dates: `${startFormatted}/${endFormatted}`,
-    details: details
-  });
+  const params = new URLSearchParams();
+  params.set('action', 'TEMPLATE');
+  params.set('text', eventTitle);
+  params.set('dates', `${startFormatted}/${endFormatted}`);
+  params.set('details', details);
 
   if (guestEmails) {
     params.set('add', guestEmails);
@@ -72,14 +95,20 @@ export function openGoogleCalendarEvent(minute: MeetingMinute, organizationName?
  * Genera y descarga un archivo estándar iCalendar (.ics) compatible con Outlook, Apple y Google
  */
 export function downloadIcsFile(minute: MeetingMinute, organizationName?: string): void {
-  const dateToUse = minute.nextSessionDate || minute.date || new Date().toISOString().split('T')[0];
+  const dateToUse = minute.nextSessionDate || minute.date;
   const timeToUse = minute.time || '10:00';
 
   const start = formatToCalendarDateTime(dateToUse, timeToUse, 0);
   const end = formatToCalendarDateTime(dateToUse, timeToUse, 1);
   const org = organizationName || 'PactaCloud';
 
-  const icsContent = [
+  const guestEmails = (minute.attendees || [])
+    .map((a) => a.email?.trim())
+    .filter((email): email is string => Boolean(email && email.includes('@')));
+
+  const attendeeLines = guestEmails.map((email) => `ATTENDEE;ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:${email}`).join('\r\n');
+
+  const icsLines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//PactaCloud Suite//Actas y Compromisos//ES',
@@ -92,16 +121,24 @@ export function downloadIcsFile(minute: MeetingMinute, organizationName?: string
     `DTEND:${end}`,
     `SUMMARY:Próxima Sesión: ${minute.title} (${org})`,
     `DESCRIPTION:Acta gestionada en PactaCloud Suite - Carpeta ${minute.directory}`,
-    'STATUS:CONFIRMED',
-    'END:VEVENT',
-    'END:VCALENDAR'
-  ].join('\r\n');
+    'STATUS:CONFIRMED'
+  ];
 
+  if (attendeeLines) {
+    icsLines.push(attendeeLines);
+  }
+
+  icsLines.push('END:VEVENT');
+  icsLines.push('END:VCALENDAR');
+
+  const icsContent = icsLines.join('\r\n');
   const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.setAttribute('download', `reunion-${minute.title.replace(/[^a-zA-Z0-9_-]/g, '_')}.ics`);
+  link.href = url;
+  link.setAttribute('download', `reunion-${minute.nextSessionDate || 'proxima-sesion'}.ics`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
