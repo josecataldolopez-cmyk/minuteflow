@@ -47,7 +47,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }
       });
       if (error) {
-        setErrorMsg(error.message);
+        if (
+          error.message.includes('provider is not enabled') ||
+          error.message.includes('Unsupported provider')
+        ) {
+          setErrorMsg(
+            'El inicio de sesión con Google aún no está habilitado en tu panel de Supabase. Puedes registrarte o iniciar sesión con tu correo y contraseña en el formulario inferior mientras tanto.'
+          );
+        } else {
+          setErrorMsg(error.message);
+        }
         setIsLoading(false);
       }
     } catch (err: unknown) {
