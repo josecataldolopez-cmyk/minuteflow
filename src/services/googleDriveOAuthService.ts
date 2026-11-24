@@ -438,13 +438,26 @@ export async function uploadMinuteViaOAuth(
 }
 
 /**
+ * Función centralizada para escapar caracteres HTML y prevenir XSS en exportación
+ */
+function escapeHtml(str?: string): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
  * Genera el documento HTML enriquecido con membrete, logo y estructura oficial
  * para que Google Drive lo convierta automáticamente en un Google Doc profesional.
  */
 function generateMinuteHTML(minute: MeetingMinute, organization?: Organization): string {
-  const orgName = organization?.name || 'PactaCloud';
-  const slogan = organization?.slogan || '';
-  const headerText = organization?.headerText || 'DOCUMENTO OFICIAL DE REUNIÓN';
+  const orgName = escapeHtml(organization?.name || 'PactaCloud');
+  const slogan = escapeHtml(organization?.slogan || '');
+  const headerText = escapeHtml(organization?.headerText || 'DOCUMENTO OFICIAL DE REUNIÓN');
   const primaryColor = organization?.primaryColor || '#4f46e5';
 
   return `
@@ -452,7 +465,7 @@ function generateMinuteHTML(minute: MeetingMinute, organization?: Organization):
     <html>
       <head>
         <meta charset="utf-8">
-        <title>${minute.title}</title>
+        <title>${escapeHtml(minute.title)}</title>
         <style>
           body { font-family: 'Arial', sans-serif; color: #1e293b; line-height: 1.6; padding: 20px; }
           .header { border-bottom: 3px solid ${primaryColor}; padding-bottom: 12px; margin-bottom: 24px; }
@@ -478,35 +491,35 @@ function generateMinuteHTML(minute: MeetingMinute, organization?: Organization):
           ${slogan ? `<div class="inst-slogan">"${slogan}"</div>` : ''}
         </div>
 
-        <h1>${minute.title}</h1>
+        <h1>${escapeHtml(minute.title)}</h1>
 
         <table class="meta-table">
           <tr>
             <td class="label">Fecha y Hora:</td>
-            <td>${minute.date} a las ${minute.time || '10:00'}</td>
+            <td>${escapeHtml(minute.date)} a las ${escapeHtml(minute.time || '10:00')}</td>
             <td class="label">Carpeta / Directorio:</td>
-            <td>${minute.directory}</td>
+            <td>${escapeHtml(minute.directory)}</td>
           </tr>
           <tr>
             <td class="label">Estado del Acta:</td>
-            <td><strong>${minute.status}</strong></td>
+            <td><strong>${escapeHtml(minute.status)}</strong></td>
             <td class="label">Próxima Sesión:</td>
-            <td>${minute.nextSessionDate || 'Por programar'}</td>
+            <td>${escapeHtml(minute.nextSessionDate || 'Por programar')}</td>
           </tr>
         </table>
 
         ${minute.objectives ? `
           <div class="section-title">Objetivo de la Reunión</div>
-          <div class="content-box">${minute.objectives}</div>
+          <div class="content-box">${escapeHtml(minute.objectives)}</div>
         ` : ''}
 
         <div class="section-title">Puntos Tratados y Acuerdos</div>
-        <div class="content-box">${minute.pointsTreated}</div>
+        <div class="content-box">${escapeHtml(minute.pointsTreated)}</div>
 
         ${minute.attendees && minute.attendees.length > 0 ? `
           <div class="section-title">Asistentes y Participantes (${minute.attendees.length})</div>
           <ul>
-            ${minute.attendees.map(a => `<li><strong>${a.name}</strong> - ${a.role || 'Miembro'} (${a.email})</li>`).join('')}
+            ${minute.attendees.map(a => `<li><strong>${escapeHtml(a.name)}</strong> - ${escapeHtml(a.role || 'Miembro')} (${escapeHtml(a.email)})</li>`).join('')}
           </ul>
         ` : ''}
 
@@ -524,9 +537,9 @@ function generateMinuteHTML(minute: MeetingMinute, organization?: Organization):
             <tbody>
               ${minute.actionItems.map(act => `
                 <tr>
-                  <td>${act.text}</td>
-                  <td>${act.assignedTo?.name || 'Equipo'}</td>
-                  <td>${act.dueDate || 'Pendiente'}</td>
+                  <td>${escapeHtml(act.text)}</td>
+                  <td>${escapeHtml(act.assignedTo?.name || 'Equipo')}</td>
+                  <td>${escapeHtml(act.dueDate || 'Pendiente')}</td>
                   <td>${act.completed ? 'Completado' : 'Pendiente'}</td>
                 </tr>
               `).join('')}

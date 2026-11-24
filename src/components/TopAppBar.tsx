@@ -13,6 +13,9 @@ interface TopAppBarProps {
   currentOrganization?: Organization;
   onSelectOrganization?: (org: Organization) => void;
   onChangeUserRole?: (role: UserRole) => void;
+  isAuthenticated?: boolean;
+  onOpenAuthModal?: () => void;
+  onSignOut?: () => void;
 }
 
 export const TopAppBar: React.FC<TopAppBarProps> = ({
@@ -26,7 +29,10 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
   organizations = [],
   currentOrganization,
   onSelectOrganization,
-  onChangeUserRole
+  onChangeUserRole,
+  isAuthenticated = false,
+  onOpenAuthModal,
+  onSignOut
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -395,24 +401,44 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
           <span className="material-symbols-outlined text-[20px]" aria-hidden="true">settings</span>
         </button>
 
+        {/* Auth CTA if Not Authenticated */}
+        {!isAuthenticated && onOpenAuthModal && (
+          <button
+            type="button"
+            onClick={onOpenAuthModal}
+            className="text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-all"
+          >
+            <span className="material-symbols-outlined text-[16px]">lock_open</span>
+            <span className="hidden sm:inline">Iniciar Sesión</span>
+          </button>
+        )}
+
         {/* User Profile Avatar with Menu */}
         <div ref={profileRef} className="relative">
           <button
             onClick={() => setShowProfileMenu(!showProfileMenu)}
             aria-label="Abrir menú de usuario"
-            className="flex items-center gap-2 p-1 rounded-full hover:ring-2 hover:ring-indigo-100 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-indigo-500"
+            className="flex items-center gap-2 p-1 rounded-full hover:ring-2 hover:ring-indigo-100 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-indigo-500 relative"
           >
             <img
               src={userProfile.avatarUrl}
               alt={userProfile.name}
               className="w-8 h-8 rounded-full object-cover border border-slate-200"
             />
+            {isAuthenticated && (
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" title="Sesión Segura Activa"></span>
+            )}
           </button>
 
           {showProfileMenu && (
             <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 p-3 z-50 animate-in fade-in space-y-3">
               <div className="border-b border-slate-100 pb-2.5">
-                <h4 className="text-xs font-bold text-slate-900">{userProfile.name}</h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-900">{userProfile.name}</h4>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isAuthenticated ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                    {isAuthenticated ? 'Cloud Auth' : 'Demo Local'}
+                  </span>
+                </div>
                 <p className="text-[11px] text-slate-500 truncate">{userProfile.email}</p>
                 <div className="flex items-center gap-1.5 mt-1">
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${roleLabels[userSystemRole]?.badge}`}>
@@ -445,6 +471,32 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
                   <span className="material-symbols-outlined text-[17px] text-indigo-600">add_to_drive</span>
                   <span>Google Drive del Establecimiento</span>
                 </button>
+
+                {isAuthenticated ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      onSignOut?.();
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-lg flex items-center gap-2 font-bold cursor-pointer border-t border-slate-100 mt-1 pt-2"
+                  >
+                    <span className="material-symbols-outlined text-[17px]">logout</span>
+                    <span>Cerrar Sesión</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      onOpenAuthModal?.();
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 text-xs text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-2 font-bold cursor-pointer border-t border-slate-100 mt-1 pt-2"
+                  >
+                    <span className="material-symbols-outlined text-[17px]">login</span>
+                    <span>Iniciar Sesión en Supabase</span>
+                  </button>
+                )}
               </div>
             </div>
           )}

@@ -7,9 +7,11 @@ import { MinuteEditorView } from './components/MinuteEditorView';
 import { ExportShareModal } from './components/ExportShareModal';
 import { SettingsView } from './components/SettingsView';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
+import { AuthModal } from './components/AuthModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Toast } from './components/Toast';
 import { storageService } from './services/storageService';
+import { getSupabase, isSupabaseConfigured } from './services/supabaseClient';
 import {
   MeetingMinute,
   ViewMode,
@@ -105,6 +107,70 @@ export default function App() {
   const [currentOrgId, setCurrentOrgId] = useState<string>(() => {
     return localStorage.getItem('minuteflow_current_org_id') || 'org-redq';
   });
+
+  // Supabase Auth State (Fase 1: Identidad & Tenancy Real)
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Monitor Supabase Authentication
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setIsAuthenticated(true);
+        handleFetchUserProfileFromAuth(session.user.id, session.user.email || '');
+      }
+    });
+
+    // Listen to changes (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setIsAuthenticated(true);
+        handleFetchUserProfileFromAuth(session.user.id, session.user.email || '');
+      } else {
+        setIsAuthenticated(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleFetchUserProfileFromAuth = async (userId: string, email: string) => {
+    try {
+      const profile = await storageService.getProfileFromSupabase(userId);
+      if (profile) {
+        setUserProfile(profile);
+        if (profile.organizationId) {
+          setCurrentOrgId(profile.organizationId);
+          localStorage.setItem('minuteflow_current_org_id', profile.organizationId);
+        }
+      } else {
+        setUserProfile((prev) => ({
+          ...prev,
+          id: userId,
+          email: email,
+          name: email.split('@')[0] || prev.name
+        }));
+      }
+    } catch {
+      // Ignorar fallback
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabase();
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+    }
+    setIsAuthenticated(false);
+    showToast('Sesión cerrada exitosamente');
+  };
 
   // Current Organization helper
   const currentOrganization = useMemo(() => {
@@ -584,6 +650,9 @@ export default function App() {
           currentOrganization={currentOrganization}
           onSelectOrganization={handleSelectOrganization}
           onChangeUserRole={handleChangeUserRole}
+          isAuthenticated={isAuthenticated}
+          onOpenAuthModal={() => setIsAuthModalOpen(true)}
+          onSignOut={handleSignOut}
         />
 
         {/* Dynamic Views (Strictly scoped by organization) */}
@@ -742,6 +811,21 @@ export default function App() {
         currentOrganization={currentOrganization}
         directories={scopedDirectories}
         onCreateDirectory={handleCreateDirectory}
+      />
+
+      {/* Supabase Authentication & Multi-Tenant Onboarding Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        availableOrganizations={organizations}
+        onAuthSuccess={(userEmail, orgId) => {
+          setIsAuthenticated(true);
+          showToast(`¡Bienvenido a PactaCloud, ${userEmail}!`);
+          if (orgId) {
+            setCurrentOrgId(orgId);
+            localStorage.setItem('minuteflow_current_org_id', orgId);
+          }
+        }}
       />
 
       {/* Legal & Privacy Compliance Modal */}

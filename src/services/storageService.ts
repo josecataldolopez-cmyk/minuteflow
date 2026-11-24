@@ -3,6 +3,19 @@ import { getSupabase, isSupabaseConfigured } from './supabaseClient';
 import { INITIAL_ORGANIZATIONS, INITIAL_MINUTES, INITIAL_ACTION_ITEMS, INITIAL_ATTENDEES, INITIAL_DIRECTORIES, INITIAL_USER_PROFILE } from '../data/mockData';
 
 /**
+ * Función defensiva para parsear JSON de localStorage con fallback seguro
+ */
+function safeJsonParse<T>(raw: string | null, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch (err) {
+    console.warn('PactaCloud: Error parseando JSON de localStorage, usando fallback:', err);
+    return fallback;
+  }
+}
+
+/**
  * Servicio unificado de persistencia para PactaCloud.
  * Sincroniza con Supabase PostgreSQL si está configurado, con fallback transparente a LocalStorage.
  */
@@ -40,7 +53,7 @@ export const storageService = {
     }
 
     const saved = localStorage.getItem('minuteflow_organizations');
-    return saved ? JSON.parse(saved) : INITIAL_ORGANIZATIONS;
+    return safeJsonParse<Organization[]>(saved, INITIAL_ORGANIZATIONS);
   },
 
   async saveOrganizations(orgs: Organization[]): Promise<void> {
@@ -114,7 +127,7 @@ export const storageService = {
     }
 
     const saved = localStorage.getItem('minuteflow_minutes');
-    const all: MeetingMinute[] = saved ? JSON.parse(saved) : INITIAL_MINUTES;
+    const all: MeetingMinute[] = safeJsonParse<MeetingMinute[]>(saved, INITIAL_MINUTES);
     return all.filter((m) => (m.organizationId || 'org-redq') === orgId);
   },
 
@@ -180,7 +193,7 @@ export const storageService = {
     }
 
     const saved = localStorage.getItem('minuteflow_action_items');
-    const all: ActionItem[] = saved ? JSON.parse(saved) : INITIAL_ACTION_ITEMS;
+    const all: ActionItem[] = safeJsonParse<ActionItem[]>(saved, INITIAL_ACTION_ITEMS);
     return all.filter((a) => (a.organizationId || 'org-redq') === orgId);
   },
 
@@ -241,7 +254,7 @@ export const storageService = {
     }
 
     const saved = localStorage.getItem('minuteflow_attendees');
-    const all: Attendee[] = saved ? JSON.parse(saved) : INITIAL_ATTENDEES;
+    const all: Attendee[] = safeJsonParse<Attendee[]>(saved, INITIAL_ATTENDEES);
     return all.filter((a) => (a.organizationId || 'org-redq') === orgId);
   },
 
@@ -298,7 +311,7 @@ export const storageService = {
     }
 
     const saved = localStorage.getItem('minuteflow_directories');
-    const all: DirectoryItem[] = saved ? JSON.parse(saved) : INITIAL_DIRECTORIES;
+    const all: DirectoryItem[] = safeJsonParse<DirectoryItem[]>(saved, INITIAL_DIRECTORIES);
     return all.filter((d) => (d.organizationId || 'org-redq') === orgId);
   },
 
@@ -329,10 +342,36 @@ export const storageService = {
   // ================= PERFIL DE USUARIO =================
   getUserProfile(): UserProfile {
     const saved = localStorage.getItem('minuteflow_user_profile');
-    return saved ? JSON.parse(saved) : INITIAL_USER_PROFILE;
+    return safeJsonParse<UserProfile>(saved, INITIAL_USER_PROFILE);
   },
 
   saveUserProfile(profile: UserProfile): void {
     localStorage.setItem('minuteflow_user_profile', JSON.stringify(profile));
+  },
+
+  async getProfileFromSupabase(userId: string): Promise<UserProfile | null> {
+    if (!isSupabaseConfigured()) return null;
+    const supabase = getSupabase();
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error || !data) return null;
+      return {
+        id: data.id,
+        name: data.full_name || 'Usuario',
+        email: data.email,
+        role: data.role === 'admin' || data.role === 'superadmin' ? 'Administrador' : 'Secretario de Actas',
+        systemRole: data.role,
+        avatarUrl: data.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(data.full_name || data.email)}`,
+        organizationId: data.organization_id
+      };
+    } catch {
+      return null;
+    }
   }
 };
