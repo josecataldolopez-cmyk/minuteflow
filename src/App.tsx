@@ -144,10 +144,12 @@ export default function App() {
       const profile = await storageService.getProfileFromSupabase(userId);
       if (profile) {
         setUserProfile(profile);
+        const targetOrg = profile.organizationId || currentOrgId;
         if (profile.organizationId) {
           setCurrentOrgId(profile.organizationId);
           localStorage.setItem('minuteflow_current_org_id', profile.organizationId);
         }
+        handleCloudSync(targetOrg);
       } else {
         setUserProfile((prev) => ({
           ...prev,
@@ -155,6 +157,7 @@ export default function App() {
           email: email,
           name: email.split('@')[0] || prev.name
         }));
+        handleCloudSync(currentOrgId);
       }
     } catch {
       // Ignorar fallback
@@ -486,6 +489,7 @@ export default function App() {
   const handleDeleteMinute = (id: string) => {
     setMinutes((prev) => prev.filter((m) => m.id !== id));
     setActionItems((prev) => prev.filter((a) => a.sourceMinuteId !== id));
+    storageService.deleteMinute(id);
     showToast('Acta eliminada del sistema');
   };
 
@@ -611,12 +615,34 @@ export default function App() {
     setCurrentView('editor');
   };
 
-  const handleTriggerSync = () => {
+  const handleCloudSync = async (orgId: string = currentOrgId) => {
     setIsSyncing(true);
-    setTimeout(() => {
+    try {
+      const syncResult = await storageService.syncAll(orgId);
+      if (syncResult.success) {
+        if (syncResult.minutes.length > 0) {
+          setMinutes(syncResult.minutes);
+        }
+        if (syncResult.actionItems.length > 0) {
+          setActionItems(syncResult.actionItems);
+        }
+        if (syncResult.attendees.length > 0) {
+          setAllAttendees(syncResult.attendees);
+        }
+        if (syncResult.directories.length > 0) {
+          setDirectories(syncResult.directories);
+        }
+      }
+      showToast(syncResult.message);
+    } catch {
+      showToast('No se pudo completar la sincronización con Supabase');
+    } finally {
       setIsSyncing(false);
-      showToast(`Sincronización completa con el espacio de ${currentOrganization.name}`);
-    }, 1200);
+    }
+  };
+
+  const handleTriggerSync = () => {
+    handleCloudSync(currentOrgId);
   };
 
   return (

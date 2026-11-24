@@ -96,29 +96,45 @@ export const storageService = {
       const supabase = getSupabase();
       if (supabase) {
         try {
-          const { data, error } = await supabase
-            .from('minutes')
-            .select('*')
-            .eq('organization_id', orgId);
+          const [minRes, actRes] = await Promise.all([
+            supabase.from('minutes').select('*').eq('organization_id', orgId).order('date', { ascending: false }),
+            supabase.from('action_items').select('*').eq('organization_id', orgId)
+          ]);
 
-          if (!error && data && data.length > 0) {
-            return data.map((m: any) => ({
-              id: m.id,
-              title: m.title,
-              directory: m.directory_name || 'Actas Generales',
-              date: m.date,
-              time: m.time,
-              formattedDate: m.formatted_date,
-              status: m.status,
-              objectives: m.objectives,
-              pointsTreated: m.points_treated,
-              keyDecisions: m.key_decisions || [],
-              nextSessionDate: m.next_session_date,
-              organizationId: m.organization_id,
-              recordingUrl: m.recording_url,
-              actionItems: [],
-              attendees: []
-            }));
+          if (!minRes.error && minRes.data && minRes.data.length > 0) {
+            const rawActions = actRes.data || [];
+            return minRes.data.map((m: any) => {
+              const minuteActions: ActionItem[] = rawActions
+                .filter((a: any) => a.minute_id === m.id)
+                .map((a: any) => ({
+                  id: a.id,
+                  text: a.title,
+                  completed: a.status === 'COMPLETED',
+                  priority: (a.priority ? a.priority.charAt(0).toUpperCase() + a.priority.slice(1).toLowerCase() : 'Medium') as any,
+                  dueDate: a.due_date,
+                  assignedTo: a.assignee ? { id: `att-${a.id}`, name: a.assignee, email: '', avatarUrl: a.assignee_avatar || '' } : undefined,
+                  sourceMinuteId: a.minute_id,
+                  organizationId: a.organization_id
+                }));
+
+              return {
+                id: m.id,
+                title: m.title,
+                directory: m.directory_name || 'Actas Generales',
+                date: m.date,
+                time: m.time,
+                formattedDate: m.formatted_date,
+                status: m.status,
+                objectives: m.objectives,
+                pointsTreated: m.points_treated,
+                keyDecisions: Array.isArray(m.key_decisions) ? m.key_decisions : [],
+                nextSessionDate: m.next_session_date,
+                organizationId: m.organization_id,
+                recordingUrl: m.recording_url,
+                actionItems: minuteActions,
+                attendees: Array.isArray(m.attendees_list) ? m.attendees_list : []
+              };
+            });
           }
         } catch (err) {
           console.warn('Fallback a localStorage para actas:', err);
@@ -149,8 +165,11 @@ export const storageService = {
             status: m.status,
             objectives: m.objectives,
             points_treated: m.pointsTreated,
+            key_decisions: m.keyDecisions || [],
+            attendees_list: m.attendees || [],
             next_session_date: m.nextSessionDate || null,
-            recording_url: m.recordingUrl || null
+            recording_url: m.recordingUrl || null,
+            updated_at: new Date().toISOString()
           }));
 
           if (rows.length > 0) {
@@ -158,6 +177,25 @@ export const storageService = {
           }
         } catch (err) {
           console.warn('No se pudo sincronizar actas en Supabase:', err);
+        }
+      }
+    }
+  },
+
+  async deleteMinute(minuteId: string): Promise<void> {
+    const saved = localStorage.getItem('minuteflow_minutes');
+    if (saved) {
+      const all = safeJsonParse<MeetingMinute[]>(saved, []);
+      localStorage.setItem('minuteflow_minutes', JSON.stringify(all.filter((m) => m.id !== minuteId)));
+    }
+
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          await supabase.from('minutes').delete().eq('id', minuteId);
+        } catch (err) {
+          console.warn('Error al eliminar acta en Supabase:', err);
         }
       }
     }
@@ -372,6 +410,55 @@ export const storageService = {
       };
     } catch {
       return null;
+    }
+  },
+
+  // ================= SINCRONIZACIÓN CLOUD COMPLETA =================
+  async syncAll(orgId: string): Promise<{
+    success: boolean;
+    message: string;
+    minutes: MeetingMinute[];
+    actionItems: ActionItem[];
+    attendees: Attendee[];
+    directories: DirectoryItem[];
+  }> {
+    if (!isSupabaseConfigured()) {
+      return {
+        success: false,
+        message: 'Supabase no está configurado. Operando con caché local.',
+        minutes: await this.getMinutes(orgId),
+        actionItems: await this.getActionItems(orgId),
+        attendees: await this.getAttendees(orgId),
+        directories: await this.getDirectories(orgId)
+      };
+    }
+
+    try {
+      const [minutes, actionItems, attendees, directories] = await Promise.all([
+        this.getMinutes(orgId),
+        this.getActionItems(orgId),
+        this.getAttendees(orgId),
+        this.getDirectories(orgId)
+      ]);
+
+      return {
+        success: true,
+        message: `Sincronización completa: ${minutes.length} actas y ${actionItems.length} compromisos verificados.`,
+        minutes,
+        actionItems,
+        attendees,
+        directories
+      };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error de sincronización con Supabase';
+      return {
+        success: false,
+        message: msg,
+        minutes: await this.getMinutes(orgId),
+        actionItems: await this.getActionItems(orgId),
+        attendees: await this.getAttendees(orgId),
+        directories: await this.getDirectories(orgId)
+      };
     }
   }
 };
