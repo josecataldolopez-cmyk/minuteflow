@@ -102,11 +102,18 @@ export function downloadIcsFile(minute: MeetingMinute, organizationName?: string
   const end = formatToCalendarDateTime(dateToUse, timeToUse, 1);
   const org = organizationName || 'PactaCloud';
 
+  const escapeIcsText = (value: string): string => value
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,');
+  const escapeIcsEmail = (email: string): string => email.replace(/[\r\n:;,]/g, '');
+
   const guestEmails = (minute.attendees || [])
     .map((a) => a.email?.trim())
-    .filter((email): email is string => Boolean(email && email.includes('@')));
+    .filter((email): email is string => Boolean(email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)));
 
-  const attendeeLines = guestEmails.map((email) => `ATTENDEE;ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:${email}`).join('\r\n');
+  const attendeeLines = guestEmails.map((email) => `ATTENDEE;ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:${escapeIcsEmail(email)}`).join('\r\n');
 
   const icsLines = [
     'BEGIN:VCALENDAR',
@@ -119,8 +126,8 @@ export function downloadIcsFile(minute: MeetingMinute, organizationName?: string
     `DTSTAMP:${start}Z`,
     `DTSTART:${start}`,
     `DTEND:${end}`,
-    `SUMMARY:Próxima Sesión: ${minute.title} (${org})`,
-    `DESCRIPTION:Acta gestionada en PactaCloud Suite - Carpeta ${minute.directory}`,
+    `SUMMARY:${escapeIcsText(`Próxima Sesión: ${minute.title} (${org})`)}`,
+    `DESCRIPTION:${escapeIcsText(`Acta gestionada en PactaCloud Suite - Carpeta ${minute.directory}`)}`,
     'STATUS:CONFIRMED'
   ];
 

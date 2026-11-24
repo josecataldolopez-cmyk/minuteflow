@@ -6,6 +6,7 @@ import { GoogleDriveIntegrationTab } from './settings/GoogleDriveIntegrationTab'
 import { DirectoryManagementTab } from './settings/DirectoryManagementTab';
 import { FolderManagementTab } from './settings/FolderManagementTab';
 import { DataManagementTab } from './settings/DataManagementTab';
+import { InvitationManagementTab } from './settings/InvitationManagementTab';
 import { ErrorBoundary } from './ErrorBoundary';
 
 import { COLOR_PRESETS, LOGO_PRESETS } from '../constants/brandingPresets';
@@ -36,7 +37,7 @@ interface SettingsViewProps {
   onPurgeDemoOrganizations?: () => void;
 }
 
-type SettingsTab = 'all' | 'branding' | 'profile' | 'drive' | 'directory' | 'folders' | 'data';
+type SettingsTab = 'all' | 'branding' | 'profile' | 'drive' | 'directory' | 'folders' | 'invites' | 'data';
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   userProfile,
@@ -111,6 +112,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     { id: 'drive', label: 'Google Drive', icon: 'cloud_sync' },
     { id: 'directory', label: 'Directorio', icon: 'group', count: allAttendees.length },
     { id: 'folders', label: 'Carpetas', icon: 'folder', count: directories.length },
+    ...(isAdmin ? [{ id: 'invites' as const, label: 'Invitaciones', icon: 'group_add' }] : []),
     { id: 'data', label: 'Base de Datos', icon: 'database' }
   ];
 
@@ -225,6 +227,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               onShowToast={onShowToast}
               orgName={orgName}
               orgId={currentOrganization?.id || 'org-redq'}
+            />
+          </ErrorBoundary>
+        )}
+
+        {isAdmin && (activeTab === 'all' || activeTab === 'invites') && (
+          <ErrorBoundary fallbackTitle="Error al cargar invitaciones">
+            <InvitationManagementTab
+              isAdmin={isAdmin}
+              orgName={orgName}
+              onShowToast={onShowToast}
             />
           </ErrorBoundary>
         )}

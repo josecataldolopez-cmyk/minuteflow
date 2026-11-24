@@ -10,6 +10,10 @@ export interface GoogleOAuthSession {
 }
 
 const CLIENT_ID_STORAGE_KEY = 'minuteflow_google_client_id';
+// Los access tokens sólo viven durante la pestaña actual. Persistirlos en
+// localStorage permitiría que cualquier XSS los exfiltrara incluso después de
+// cerrar sesión o recargar la aplicación.
+const oauthSessions = new Map<string, GoogleOAuthSession>();
 
 // Obtiene el Client ID de Google configurado (desde .env o desde configuración personalizada)
 export function getGoogleClientId(): string {
@@ -24,21 +28,15 @@ export function setGoogleClientId(clientId: string): void {
 
 export function getStoredOAuthSession(orgId: string): GoogleOAuthSession | null {
   if (!orgId) return null;
-  const raw = localStorage.getItem(`minuteflow_google_oauth_${orgId}`);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  return oauthSessions.get(orgId) || null;
 }
 
 export function saveOAuthSession(orgId: string, session: GoogleOAuthSession): void {
-  localStorage.setItem(`minuteflow_google_oauth_${orgId}`, JSON.stringify(session));
+  oauthSessions.set(orgId, session);
 }
 
 export function clearOAuthSession(orgId: string): void {
-  localStorage.removeItem(`minuteflow_google_oauth_${orgId}`);
+  oauthSessions.delete(orgId);
 }
 
 export function isDriveOAuthConnected(orgId: string): boolean {
@@ -248,11 +246,8 @@ export async function createDriveSubfolder(
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         signal: AbortSignal.timeout(25000),
         body: JSON.stringify({
-          secret:
-            localStorage.getItem(`minuteflow_drive_webhook_secret_${orgId}`) ||
-            localStorage.getItem('minuteflow_drive_webhook_secret') ||
-            (import.meta.env.VITE_DRIVE_WEBHOOK_SECRET as string) ||
-            '',
+          secret: sessionStorage.getItem(`minuteflow_drive_webhook_secret_${orgId}`) ||
+            sessionStorage.getItem('minuteflow_drive_webhook_secret') || '',
           action: 'create_folder',
           folderName: cleanSubfolder,
           organizationId: orgId,

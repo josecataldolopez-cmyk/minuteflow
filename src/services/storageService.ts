@@ -19,6 +19,29 @@ function safeJsonParse<T>(raw: string | null, fallback: T): T {
  * Servicio unificado de persistencia para PactaCloud.
  * Sincroniza con Supabase PostgreSQL si está configurado, con fallback transparente a LocalStorage.
  */
+export interface StorageMutationResult {
+  success: boolean;
+  error?: string;
+}
+
+async function execSupabaseWrite(
+  label: string,
+  operation: () => PromiseLike<{ error: { message: string } | null }>
+): Promise<StorageMutationResult> {
+  try {
+    const { error } = await operation();
+    if (error) {
+      console.error(`[Supabase ${label}]`, error.message);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Error de conexión con Supabase';
+    console.error(`[Supabase ${label}]`, msg);
+    return { success: false, error: msg };
+  }
+}
+
 export const storageService = {
   // ================= ORGANIZACIONES =================
   async getOrganizations(): Promise<Organization[]> {
@@ -56,38 +79,37 @@ export const storageService = {
     return safeJsonParse<Organization[]>(saved, INITIAL_ORGANIZATIONS);
   },
 
-  async saveOrganizations(orgs: Organization[]): Promise<void> {
+  async saveOrganizations(orgs: Organization[]): Promise<StorageMutationResult> {
     localStorage.setItem('minuteflow_organizations', JSON.stringify(orgs));
 
     if (isSupabaseConfigured()) {
       const supabase = getSupabase();
       if (supabase) {
-        try {
-          const rows = orgs.map((o) => ({
-            id: o.id,
-            name: o.name,
-            code: o.code,
-            tax_id: o.taxId,
-            domain: o.domain,
-            drive_account: o.driveAccount,
-            drive_webhook_url: o.driveWebhookUrl,
-            logo_url: o.logoUrl,
-            plan: o.plan,
-            primary_color: o.primaryColor,
-            secondary_color: o.secondaryColor,
-            slogan: o.slogan,
-            header_text: o.headerText,
-            address: o.address
-          }));
+        const rows = orgs.map((o) => ({
+          id: o.id,
+          name: o.name,
+          code: o.code,
+          tax_id: o.taxId,
+          domain: o.domain,
+          drive_account: o.driveAccount,
+          drive_webhook_url: o.driveWebhookUrl,
+          logo_url: o.logoUrl,
+          plan: o.plan,
+          primary_color: o.primaryColor,
+          secondary_color: o.secondaryColor,
+          slogan: o.slogan,
+          header_text: o.headerText,
+          address: o.address
+        }));
 
-          if (rows.length > 0) {
-            await supabase.from('organizations').upsert(rows);
-          }
-        } catch (err) {
-          console.warn('No se pudo sincronizar organizaciones en Supabase:', err);
+        if (rows.length > 0) {
+          return execSupabaseWrite('saveOrganizations', () =>
+            supabase.from('organizations').upsert(rows)
+          );
         }
       }
     }
+    return { success: true };
   },
 
   // ================= ACTAS (MINUTES) =================
@@ -147,42 +169,41 @@ export const storageService = {
     return all.filter((m) => (m.organizationId || 'org-redq') === orgId);
   },
 
-  async saveMinutes(minutes: MeetingMinute[]): Promise<void> {
+  async saveMinutes(minutes: MeetingMinute[]): Promise<StorageMutationResult> {
     localStorage.setItem('minuteflow_minutes', JSON.stringify(minutes));
 
     if (isSupabaseConfigured()) {
       const supabase = getSupabase();
       if (supabase) {
-        try {
-          const rows = minutes.map((m) => ({
-            id: m.id,
-            organization_id: m.organizationId || 'org-redq',
-            title: m.title,
-            directory_name: m.directory,
-            date: m.date,
-            time: m.time || '12:00',
-            formatted_date: m.formattedDate,
-            status: m.status,
-            objectives: m.objectives,
-            points_treated: m.pointsTreated,
-            key_decisions: m.keyDecisions || [],
-            attendees_list: m.attendees || [],
-            next_session_date: m.nextSessionDate || null,
-            recording_url: m.recordingUrl || null,
-            updated_at: new Date().toISOString()
-          }));
+        const rows = minutes.map((m) => ({
+          id: m.id,
+          organization_id: m.organizationId || 'org-redq',
+          title: m.title,
+          directory_name: m.directory,
+          date: m.date,
+          time: m.time || '12:00',
+          formatted_date: m.formattedDate,
+          status: m.status,
+          objectives: m.objectives,
+          points_treated: m.pointsTreated,
+          key_decisions: m.keyDecisions || [],
+          attendees_list: m.attendees || [],
+          next_session_date: m.nextSessionDate || null,
+          recording_url: m.recordingUrl || null,
+          updated_at: new Date().toISOString()
+        }));
 
-          if (rows.length > 0) {
-            await supabase.from('minutes').upsert(rows);
-          }
-        } catch (err) {
-          console.warn('No se pudo sincronizar actas en Supabase:', err);
+        if (rows.length > 0) {
+          return execSupabaseWrite('saveMinutes', () =>
+            supabase.from('minutes').upsert(rows)
+          );
         }
       }
     }
+    return { success: true };
   },
 
-  async deleteMinute(minuteId: string): Promise<void> {
+  async deleteMinute(minuteId: string): Promise<StorageMutationResult> {
     const saved = localStorage.getItem('minuteflow_minutes');
     if (saved) {
       const all = safeJsonParse<MeetingMinute[]>(saved, []);
@@ -192,13 +213,12 @@ export const storageService = {
     if (isSupabaseConfigured()) {
       const supabase = getSupabase();
       if (supabase) {
-        try {
-          await supabase.from('minutes').delete().eq('id', minuteId);
-        } catch (err) {
-          console.warn('Error al eliminar acta en Supabase:', err);
-        }
+        return execSupabaseWrite('deleteMinute', () =>
+          supabase.from('minutes').delete().eq('id', minuteId)
+        );
       }
     }
+    return { success: true };
   },
 
   // ================= COMPROMISOS / TAREAS =================
@@ -235,33 +255,32 @@ export const storageService = {
     return all.filter((a) => (a.organizationId || 'org-redq') === orgId);
   },
 
-  async saveActionItems(items: ActionItem[]): Promise<void> {
+  async saveActionItems(items: ActionItem[]): Promise<StorageMutationResult> {
     localStorage.setItem('minuteflow_action_items', JSON.stringify(items));
 
     if (isSupabaseConfigured()) {
       const supabase = getSupabase();
       if (supabase) {
-        try {
-          const rows = items.map((a) => ({
-            id: a.id,
-            minute_id: a.sourceMinuteId || null,
-            organization_id: a.organizationId || 'org-redq',
-            title: a.text,
-            assignee: a.assignedTo?.name || 'Sin asignar',
-            assignee_avatar: a.assignedTo?.avatarUrl || null,
-            due_date: a.dueDate,
-            status: a.completed ? 'COMPLETED' : 'PENDING',
-            priority: a.priority ? a.priority.toUpperCase() : 'MEDIUM'
-          }));
+        const rows = items.map((a) => ({
+          id: a.id,
+          minute_id: a.sourceMinuteId || null,
+          organization_id: a.organizationId || 'org-redq',
+          title: a.text,
+          assignee: a.assignedTo?.name || 'Sin asignar',
+          assignee_avatar: a.assignedTo?.avatarUrl || null,
+          due_date: a.dueDate,
+          status: a.completed ? 'COMPLETED' : 'PENDING',
+          priority: a.priority ? a.priority.toUpperCase() : 'MEDIUM'
+        }));
 
-          if (rows.length > 0) {
-            await supabase.from('action_items').upsert(rows);
-          }
-        } catch (err) {
-          console.warn('No se pudo sincronizar compromisos en Supabase:', err);
+        if (rows.length > 0) {
+          return execSupabaseWrite('saveActionItems', () =>
+            supabase.from('action_items').upsert(rows)
+          );
         }
       }
     }
+    return { success: true };
   },
 
   // ================= CONTACTOS Y ASISTENTES =================
@@ -296,30 +315,29 @@ export const storageService = {
     return all.filter((a) => (a.organizationId || 'org-redq') === orgId);
   },
 
-  async saveAttendees(attendees: Attendee[]): Promise<void> {
+  async saveAttendees(attendees: Attendee[]): Promise<StorageMutationResult> {
     localStorage.setItem('minuteflow_attendees', JSON.stringify(attendees));
 
     if (isSupabaseConfigured()) {
       const supabase = getSupabase();
       if (supabase) {
-        try {
-          const rows = attendees.map((att) => ({
-            id: att.id,
-            organization_id: att.organizationId || 'org-redq',
-            name: att.name,
-            email: att.email,
-            role: att.role || 'Miembro',
-            avatar_url: att.avatarUrl || null
-          }));
+        const rows = attendees.map((att) => ({
+          id: att.id,
+          organization_id: att.organizationId || 'org-redq',
+          name: att.name,
+          email: att.email,
+          role: att.role || 'Miembro',
+          avatar_url: att.avatarUrl || null
+        }));
 
-          if (rows.length > 0) {
-            await supabase.from('attendees').upsert(rows);
-          }
-        } catch (err) {
-          console.warn('No se pudo sincronizar asistentes en Supabase:', err);
+        if (rows.length > 0) {
+          return execSupabaseWrite('saveAttendees', () =>
+            supabase.from('attendees').upsert(rows)
+          );
         }
       }
     }
+    return { success: true };
   },
 
   // ================= CARPETAS / DIRECTORIOS =================
@@ -353,28 +371,27 @@ export const storageService = {
     return all.filter((d) => (d.organizationId || 'org-redq') === orgId);
   },
 
-  async saveDirectories(directories: DirectoryItem[]): Promise<void> {
+  async saveDirectories(directories: DirectoryItem[]): Promise<StorageMutationResult> {
     localStorage.setItem('minuteflow_directories', JSON.stringify(directories));
 
     if (isSupabaseConfigured()) {
       const supabase = getSupabase();
       if (supabase) {
-        try {
-          const rows = directories.map((d) => ({
-            id: d.id,
-            organization_id: d.organizationId || 'org-redq',
-            name: d.name,
-            color: '#4f46e5'
-          }));
+        const rows = directories.map((d) => ({
+          id: d.id,
+          organization_id: d.organizationId || 'org-redq',
+          name: d.name,
+          color: '#4f46e5'
+        }));
 
-          if (rows.length > 0) {
-            await supabase.from('directories').upsert(rows);
-          }
-        } catch (err) {
-          console.warn('No se pudo sincronizar directorios en Supabase:', err);
+        if (rows.length > 0) {
+          return execSupabaseWrite('saveDirectories', () =>
+            supabase.from('directories').upsert(rows)
+          );
         }
       }
     }
+    return { success: true };
   },
 
   // ================= PERFIL DE USUARIO =================

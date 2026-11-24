@@ -265,7 +265,9 @@ export default function App() {
 
   // Persist data on change (LocalStorage + Supabase Cloud Sync)
   useEffect(() => {
-    storageService.saveOrganizations(organizations);
+    storageService.saveOrganizations(organizations).then((res) => {
+      if (!res.success && res.error) showToast(`Error al guardar organización en nube: ${res.error}`);
+    });
   }, [organizations]);
 
   useEffect(() => {
@@ -273,19 +275,27 @@ export default function App() {
   }, [currentOrgId]);
 
   useEffect(() => {
-    storageService.saveMinutes(minutes);
+    storageService.saveMinutes(minutes).then((res) => {
+      if (!res.success && res.error) showToast(`Error al sincronizar actas en nube: ${res.error}`);
+    });
   }, [minutes]);
 
   useEffect(() => {
-    storageService.saveActionItems(actionItems);
+    storageService.saveActionItems(actionItems).then((res) => {
+      if (!res.success && res.error) showToast(`Error al sincronizar compromisos en nube: ${res.error}`);
+    });
   }, [actionItems]);
 
   useEffect(() => {
-    storageService.saveAttendees(allAttendees);
+    storageService.saveAttendees(allAttendees).then((res) => {
+      if (!res.success && res.error) showToast(`Error al sincronizar asistentes en nube: ${res.error}`);
+    });
   }, [allAttendees]);
 
   useEffect(() => {
-    storageService.saveDirectories(directories);
+    storageService.saveDirectories(directories).then((res) => {
+      if (!res.success && res.error) showToast(`Error al sincronizar carpetas en nube: ${res.error}`);
+    });
   }, [directories]);
 
   useEffect(() => {
@@ -501,8 +511,13 @@ export default function App() {
   const handleDeleteMinute = (id: string) => {
     setMinutes((prev) => prev.filter((m) => m.id !== id));
     setActionItems((prev) => prev.filter((a) => a.sourceMinuteId !== id));
-    storageService.deleteMinute(id);
-    showToast('Acta eliminada del sistema');
+    storageService.deleteMinute(id).then((res) => {
+      if (!res.success && res.error) {
+        showToast(`Error al eliminar en nube: ${res.error}`);
+      } else {
+        showToast('Acta eliminada del sistema');
+      }
+    });
   };
 
   const handleDuplicateMinute = (minuteToDup: MeetingMinute) => {

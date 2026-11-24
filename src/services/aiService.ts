@@ -1,3 +1,5 @@
+import { getSupabase, isSupabaseConfigured } from './supabaseClient';
+
 export interface AIAnalysisResult {
   title?: string;
   objectives?: string;
@@ -26,9 +28,20 @@ export async function analyzeAndEnhanceMinute(
 
   // 1. Intentar primero a través del Gateway Serverless seguro en el backend
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabase();
+      if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+      }
+    }
+
     const serverRes = await fetch('/api/enhance', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       signal: AbortSignal.timeout(15000),
       body: JSON.stringify({ rawContent: cleanInput, contextTitle })
     });

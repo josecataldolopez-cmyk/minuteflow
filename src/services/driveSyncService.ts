@@ -15,12 +15,12 @@ const DEFAULT_ACCOUNT = 'jose.cataldo@redq.cl';
  */
 export function getDriveWebhookSecret(orgId?: string): string {
   if (orgId) {
-    const saved = localStorage.getItem(`${SECRET_STORAGE_KEY}_${orgId}`);
+    const saved = sessionStorage.getItem(`${SECRET_STORAGE_KEY}_${orgId}`);
     if (saved && saved.trim()) return saved.trim();
   }
-  const global = localStorage.getItem(SECRET_STORAGE_KEY);
+  const global = sessionStorage.getItem(SECRET_STORAGE_KEY);
   if (global && global.trim()) return global.trim();
-  return (import.meta.env.VITE_DRIVE_WEBHOOK_SECRET as string) || '';
+  return '';
 }
 
 /**
@@ -29,9 +29,9 @@ export function getDriveWebhookSecret(orgId?: string): string {
 export function setDriveWebhookSecret(orgId: string | undefined, secret: string): void {
   const clean = secret.trim();
   if (orgId) {
-    localStorage.setItem(`${SECRET_STORAGE_KEY}_${orgId}`, clean);
+    sessionStorage.setItem(`${SECRET_STORAGE_KEY}_${orgId}`, clean);
   }
-  localStorage.setItem(SECRET_STORAGE_KEY, clean);
+  sessionStorage.setItem(SECRET_STORAGE_KEY, clean);
 }
 
 /**

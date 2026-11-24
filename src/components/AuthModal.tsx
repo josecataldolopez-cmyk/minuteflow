@@ -19,9 +19,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [selectedOrgId, setSelectedOrgId] = useState<string>(
-    availableOrganizations[0]?.id || 'org-redq'
-  );
+  const [inviteCode, setInviteCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
@@ -112,8 +110,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           options: {
             data: {
               full_name: fullName.trim(),
-              organization_id: selectedOrgId,
-              role: 'editor'
+              // La organización y el rol se resuelven exclusivamente en el
+              // trigger de Supabase a partir de una invitación válida.
+              invite_code: inviteCode.trim()
             }
           }
         });
@@ -125,7 +124,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }
 
         if (data.session) {
-          onAuthSuccess(email.trim(), selectedOrgId);
+          onAuthSuccess(email.trim());
           onClose();
         } else {
           setInfoMsg('¡Cuenta creada exitosamente! Revisa tu correo para confirmar tu registro.');
@@ -293,18 +292,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             {mode === 'signup' && (
               <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-1">Establecimiento / Organización:</label>
-                <select
-                  value={selectedOrgId}
-                  onChange={(e) => setSelectedOrgId(e.target.value)}
-                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium bg-white"
-                >
-                  {availableOrganizations.map((org) => (
-                    <option key={org.id} value={org.id}>
-                      {org.name} ({org.code})
-                    </option>
-                  ))}
-                </select>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">Código de invitación:</label>
+                <input
+                  type="text"
+                  required
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  placeholder="Código entregado por tu administrador"
+                  className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                />
+                <p className="mt-1 text-[10px] text-slate-500">El código determina de forma segura tu organización y permisos iniciales.</p>
               </div>
             )}
 
