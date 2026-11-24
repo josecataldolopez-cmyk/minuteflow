@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MeetingMinute, Attendee, ActionItem, DirectoryItem, MinuteStatus, Organization, UserRole } from '../types';
 import { ContactPickerModal } from './ContactPickerModal';
 import { analyzeAndEnhanceMinute } from '../services/aiService';
+import { openGoogleCalendarEvent } from '../services/calendarService';
 
 interface MinuteEditorViewProps {
   minute: MeetingMinute | null;
@@ -718,9 +719,45 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
                   className="rounded text-indigo-600 focus:ring-0 w-4 h-4 cursor-pointer"
                 />
                 <label htmlFor="sync-cal" className="text-xs text-slate-600 cursor-pointer">
-                  Sincronizar automáticamente con Google Calendar
+                  Agendar automáticamente al guardar el acta
                 </label>
               </div>
+
+              {/* Botón directo de apertura en Google Calendar */}
+              {nextSessionDate && (
+                <div className="pt-2 border-t border-slate-100 flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const tempMinute: MeetingMinute = {
+                        id: minute?.id || 'temp',
+                        title,
+                        directory,
+                        date,
+                        formattedDate: '',
+                        time,
+                        status: 'Borrador',
+                        objectives,
+                        pointsTreated,
+                        keyDecisions: pointsTreated.split('\n').filter(Boolean).slice(0, 4),
+                        actionItems,
+                        attendees,
+                        nextSessionDate,
+                        syncCalendar
+                      };
+                      openGoogleCalendarEvent(tempMinute, currentOrganization?.name);
+                    }}
+                    className="w-full py-2 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-indigo-200/60 shadow-2xs"
+                  >
+                    <span className="material-symbols-outlined text-[17px]">calendar_today</span>
+                    <span>Abrir y Agendar en Calendar</span>
+                    <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+                  </button>
+                  <p className="text-[10px] text-slate-400 text-center">
+                    Precarga título, fecha, hora y correos de los asistentes
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

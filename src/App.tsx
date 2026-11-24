@@ -12,6 +12,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Toast } from './components/Toast';
 import { storageService } from './services/storageService';
 import { getSupabase, isSupabaseConfigured } from './services/supabaseClient';
+import { openGoogleCalendarEvent } from './services/calendarService';
 import {
   MeetingMinute,
   ViewMode,
@@ -481,6 +482,15 @@ export default function App() {
       organizationId: currentOrgId
     }));
     setActionItems([...newActionsFromMinute, ...otherActions]);
+
+    // Abrir Google Calendar si el usuario activó la casilla de próxima sesión
+    if (minuteWithOrg.syncCalendar && minuteWithOrg.nextSessionDate) {
+      try {
+        openGoogleCalendarEvent(minuteWithOrg, currentOrganization.name);
+      } catch {
+        // En caso de bloqueo de popups del navegador
+      }
+    }
 
     setActiveMinute(null);
     setCurrentView('library');
