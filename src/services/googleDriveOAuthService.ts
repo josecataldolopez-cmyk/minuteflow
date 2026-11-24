@@ -83,7 +83,7 @@ export async function connectGoogleDriveOAuth(
             const expiresAt = Date.now() + expiresIn * 1000;
 
             // Consultar email del usuario autenticado en Google
-            let detectedEmail = preferredEmail || 'usuario@institucion.cl';
+            let detectedEmail = preferredEmail || '';
             try {
               const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
                 headers: { Authorization: `Bearer ${token}` },
@@ -120,19 +120,12 @@ export async function connectGoogleDriveOAuth(
     });
   }
 
-  // Caso 2: Modo Conexión Instantánea con 1 clic (sin requerir Google Cloud Console inmediatamente)
-  // Guarda la sesión autorizada con el correo corporativo del establecimiento
-  const targetEmail = preferredEmail || 'rectoria@colegio.cl';
-  const session: GoogleOAuthSession = {
-    connected: true,
-    email: targetEmail,
-    accessToken: `mock_oauth_${Date.now()}`,
-    expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
-    connectedAt: new Date().toISOString()
+  // Caso 2: Sin Google Client ID configurado — no se puede autorizar de verdad.
+  // Se devuelve un error explícito en lugar de simular una conexión falsa.
+  return {
+    success: false,
+    error: 'Google Drive no está configurado. Define VITE_GOOGLE_CLIENT_ID (o regístralo en Configuración > Google Drive) para autorizar tu cuenta real.'
   };
-
-  saveOAuthSession(orgId, session);
-  return { success: true, email: targetEmail };
 }
 
 /**
@@ -255,6 +248,11 @@ export async function createDriveSubfolder(
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         signal: AbortSignal.timeout(25000),
         body: JSON.stringify({
+          secret:
+            localStorage.getItem(`minuteflow_drive_webhook_secret_${orgId}`) ||
+            localStorage.getItem('minuteflow_drive_webhook_secret') ||
+            (import.meta.env.VITE_DRIVE_WEBHOOK_SECRET as string) ||
+            '',
           action: 'create_folder',
           folderName: cleanSubfolder,
           organizationId: orgId,

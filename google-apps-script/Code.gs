@@ -16,7 +16,32 @@
  *    - Quién tiene acceso: "Cualquier usuario" (Anyone)
  * 7. Haz clic en "Implementar", autoriza los permisos de Google Drive cuando te lo solicite.
  * 8. Copia la "URL de la aplicación web" (termina en /exec) y pégala en PactaCloud en Configuración > Google Drive.
+ *
+ * SEGURIDAD (obligatorio):
+ * 9. En el editor del script: Configuración del proyecto (ícono de engranaje) >
+ *    "Propiedades del script" > agrega la propiedad SHARED_SECRET con un valor
+ *    largo y aleatorio (ej. generado con un password manager).
+ * 10. Configura el MISMO valor en PactaCloud (variable de entorno DRIVE_WEBHOOK_SECRET
+ *    o el campo "Secreto del webhook" en Configuración > Google Drive).
+ *    Toda petición POST debe incluir { "secret": "<SHARED_SECRET>" } o será rechazada.
  */
+
+/**
+ * Obtiene el secreto compartido desde las Propiedades del Script.
+ * Si no está configurado, el webhook rechaza todas las peticiones por seguridad.
+ */
+function getSharedSecret() {
+  return PropertiesService.getScriptProperties().getProperty("SHARED_SECRET") || "";
+}
+
+/**
+ * Respuesta de error estándar en JSON.
+ */
+function errorResponse(status, message) {
+  return ContentService.createTextOutput(
+    JSON.stringify({ status: status, message: message })
+  ).setMimeType(ContentService.MimeType.JSON);
+}
 
 function doGet(e) {
   return ContentService.createTextOutput(
@@ -38,6 +63,16 @@ function doPost(e) {
     }
 
     var data = JSON.parse(rawData);
+
+    // Validación de seguridad: exigir secreto compartido coincidente.
+    var expectedSecret = getSharedSecret();
+    if (!expectedSecret) {
+      return errorResponse("error", "Webhook no configurado: falta la propiedad SHARED_SECRET en el script.");
+    }
+    if (data.secret !== expectedSecret) {
+      return errorResponse("error", "No autorizado: secreto de webhook inválido o ausente.");
+    }
+
     var orgName = data.organizationName || "Establecimiento";
     var rootFolderName = "PactaCloud - Actas Oficiales (" + orgName + ")";
     var rootFolder = getOrCreateFolder(DriveApp.getRootFolder(), rootFolderName);

@@ -1,14 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
-
-// Initialize Gemini Client with safe fallback
-const getGeminiClient = () => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (window as any).__GEMINI_API_KEY__;
-  if (!apiKey) {
-    return null;
-  }
-  return new GoogleGenAI({ apiKey });
-};
-
 export interface AIAnalysisResult {
   title?: string;
   objectives?: string;
@@ -22,8 +11,9 @@ export interface AIAnalysisResult {
 
 /**
  * Enhances rough notes, audio transcripts or minute points using Gemini AI.
- * Intenta primero mediante la Serverless Function segura (/api/enhance) para no exponer API keys;
- * si no está disponible, utiliza el SDK directo en cliente o el motor heurístico estructurado.
+ * Toda llamada a IA pasa por la Serverless Function segura (/api/enhance), que
+ * resguarda la API key en el servidor. Si no está disponible, se usa el motor
+ * heurístico estructurado como fallback offline.
  */
 export async function analyzeAndEnhanceMinute(
   rawContent: string,
@@ -58,63 +48,7 @@ export async function analyzeAndEnhanceMinute(
     // Si la función serverless no está disponible (ej. entorno de desarrollo estático local), continuar
   }
 
-  // 2. Intentar con cliente directo si se configuró VITE_GEMINI_API_KEY
-  const ai = getGeminiClient();
-  if (ai) {
-    try {
-      const prompt = `
-Eres un secretario ejecutivo corporativo experto en redacción de actas de directorio y reuniones de alta dirección.
-Analiza las siguientes notas o transcripción de reunión y genera una minuta formal y estructurada.
-
-Contexto / Título preliminar: ${contextTitle || 'Reunión Ejecutiva'}
-Notas/Transcripción de la reunión:
-"""
-${cleanInput.slice(0, 8000)}
-"""
-
-Responde estrictamente en formato JSON válido con la siguiente estructura (sin bloques markdown adicionales fuera del json):
-{
-  "title": "Título formal y conciso de la reunión",
-  "objectives": "Objetivo principal o propósito de la sesión en 1-2 oraciones formales",
-  "pointsTreated": "Puntos tratados y acuerdos adoptados organizados con viñetas claras (• Puntos con viñetas)",
-  "actionItems": [
-    {
-      "text": "Descripción clara del compromiso o tarea",
-      "dueDate": "YYYY-MM-DD",
-      "priority": "High"
-    }
-  ]
-}
-`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-      });
-
-      const responseText = response.text || '';
-      // Limpieza de bloques markdown ```json ... ```
-      const cleaned = responseText
-        .replace(/^```(?:json)?\s*/i, '')
-        .replace(/\s*```$/i, '')
-        .trim();
-
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return {
-          title: parsed.title,
-          objectives: parsed.objectives,
-          pointsTreated: parsed.pointsTreated,
-          actionItems: parsed.actionItems || []
-        };
-      }
-    } catch (error) {
-      console.warn('Error en llamada directa a Gemini AI, usando motor estructurado:', error);
-    }
-  }
-
-  // 3. Fallback estructurado y seguro
+  // 2. Fallback estructurado y seguro (sin API key ni backend disponible)
   return simulateAIEnhancement(cleanInput, contextTitle);
 }
 

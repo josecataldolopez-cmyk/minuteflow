@@ -14,6 +14,8 @@ import {
   setOrgDriveAccount,
   getOrgDriveWebhookUrl,
   setOrgDriveWebhookUrl,
+  getDriveWebhookSecret,
+  setDriveWebhookSecret,
   validateDriveWebhookUrl,
   testDriveWebhook,
   APPS_SCRIPT_TEMPLATE,
@@ -43,6 +45,7 @@ export const GoogleDriveIntegrationTab: React.FC<GoogleDriveIntegrationTabProps>
 
   // Webhook States (Método 1: Apps Script)
   const [webhookInput, setWebhookInput] = useState(() => getOrgDriveWebhookUrl(orgId));
+  const [webhookSecretInput, setWebhookSecretInput] = useState(() => getDriveWebhookSecret(orgId));
   const [isSavedWebhook, setIsSavedWebhook] = useState(() => Boolean(getOrgDriveWebhookUrl(orgId)));
   const [isTestingWebhook, setIsTestingWebhook] = useState(false);
   const [showWebhookGuide, setShowWebhookGuide] = useState(false);
@@ -70,6 +73,7 @@ export const GoogleDriveIntegrationTab: React.FC<GoogleDriveIntegrationTabProps>
     setDriveEmailInput(getDriveOAuthAccount(orgId) || freshEmail);
     const savedWeb = getOrgDriveWebhookUrl(orgId);
     setWebhookInput(savedWeb);
+    setWebhookSecretInput(getDriveWebhookSecret(orgId));
     setIsSavedWebhook(Boolean(savedWeb));
   }, [currentOrganization, orgId]);
 
@@ -79,6 +83,7 @@ export const GoogleDriveIntegrationTab: React.FC<GoogleDriveIntegrationTabProps>
     const clean = webhookInput.trim();
     if (!clean) {
       setOrgDriveWebhookUrl(orgId, '');
+      setDriveWebhookSecret(orgId, '');
       setIsSavedWebhook(false);
       onShowToast('Webhook de Google Apps Script desvinculado');
       return;
@@ -91,6 +96,7 @@ export const GoogleDriveIntegrationTab: React.FC<GoogleDriveIntegrationTabProps>
     }
 
     setOrgDriveWebhookUrl(orgId, clean);
+    setDriveWebhookSecret(orgId, webhookSecretInput.trim());
     setIsSavedWebhook(true);
     onShowToast(`Webhook de Google Apps Script guardado para ${orgName}`);
   };
@@ -342,6 +348,23 @@ export const GoogleDriveIntegrationTab: React.FC<GoogleDriveIntegrationTabProps>
               </div>
             </div>
           </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-700 block mb-1">
+              Secreto del webhook (debe coincidir con SHARED_SECRET en el script):
+            </label>
+            <input
+              type="password"
+              value={webhookSecretInput}
+              onChange={(e) => setWebhookSecretInput(e.target.value)}
+              placeholder="Valor largo y aleatorio configurado en Propiedades del script"
+              className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono shadow-2xs"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">
+              Sin este secreto, el webhook rechazará todas las peticiones. Configúralo en
+              Configuración del proyecto &gt; Propiedades del script &gt; SHARED_SECRET.
+            </p>
+          </div>
         </form>
 
         {/* Guía Desplegable de 5 Pasos */}
@@ -455,7 +478,7 @@ export const GoogleDriveIntegrationTab: React.FC<GoogleDriveIntegrationTabProps>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <strong className="text-slate-800 font-semibold">{oauthAccount || 'rectoria@colegio.cl'}</strong>
+              <strong className="text-slate-800 font-semibold">{oauthAccount || 'Sin cuenta vinculada'}</strong>
               <button
                 type="button"
                 onClick={() => setIsEditingEmail(true)}

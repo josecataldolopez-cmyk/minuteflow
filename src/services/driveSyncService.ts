@@ -6,7 +6,33 @@ import {
 } from './googleDriveOAuthService';
 
 const GLOBAL_STORAGE_KEY = 'minuteflow_drive_webhook_url';
+const SECRET_STORAGE_KEY = 'minuteflow_drive_webhook_secret';
 const DEFAULT_ACCOUNT = 'jose.cataldo@redq.cl';
+
+/**
+ * Obtiene el secreto compartido del webhook de Apps Script.
+ * Debe coincidir con la propiedad SHARED_SECRET configurada en el script.
+ */
+export function getDriveWebhookSecret(orgId?: string): string {
+  if (orgId) {
+    const saved = localStorage.getItem(`${SECRET_STORAGE_KEY}_${orgId}`);
+    if (saved && saved.trim()) return saved.trim();
+  }
+  const global = localStorage.getItem(SECRET_STORAGE_KEY);
+  if (global && global.trim()) return global.trim();
+  return (import.meta.env.VITE_DRIVE_WEBHOOK_SECRET as string) || '';
+}
+
+/**
+ * Guarda el secreto compartido del webhook para una organización.
+ */
+export function setDriveWebhookSecret(orgId: string | undefined, secret: string): void {
+  const clean = secret.trim();
+  if (orgId) {
+    localStorage.setItem(`${SECRET_STORAGE_KEY}_${orgId}`, clean);
+  }
+  localStorage.setItem(SECRET_STORAGE_KEY, clean);
+}
 
 /**
  * Valida de forma estricta que la URL provenga del dominio oficial de Google Apps Script.
@@ -172,6 +198,7 @@ export async function syncMinuteToGoogleDrive(
   }
 
   const payload = {
+    secret: getDriveWebhookSecret(orgId),
     id: minute.id,
     title: minute.title,
     directory: minute.directory,
@@ -266,6 +293,7 @@ export async function createDriveFolderViaWebhook(
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       signal: AbortSignal.timeout(25000),
       body: JSON.stringify({
+        secret: getDriveWebhookSecret(orgId),
         action: 'create_folder',
         folderName: folderName.trim(),
         organizationId: orgId,
@@ -331,6 +359,7 @@ export async function testDriveWebhook(
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       signal: AbortSignal.timeout(20000),
       body: JSON.stringify({
+        secret: getDriveWebhookSecret(orgId),
         action: 'test',
         organizationId: orgId,
         organizationName: organizationName || 'Establecimiento'
@@ -371,8 +400,15 @@ export const APPS_SCRIPT_TEMPLATE = `/**
  * 2. Nuevo proyecto > Pega este código.
  * 3. Implementar > Nueva implementación > Tipo: "Aplicación web".
  * 4. Ejecutar como: "Yo" | Quién tiene acceso: "Cualquier usuario" (Anyone).
- * 5. Copia la URL (termina en /exec) y pégala en PactaCloud.
+ * 5. SEGURIDAD: en Configuración del proyecto > Propiedades del script, agrega
+ *    SHARED_SECRET con un valor largo y aleatorio. Configura el mismo valor en
+ *    PactaCloud (Configuración > Google Drive > Secreto del webhook).
+ * 6. Copia la URL (termina en /exec) y pégala en PactaCloud.
  */
+
+function getSharedSecret() {
+  return PropertiesService.getScriptProperties().getProperty("SHARED_SECRET") || "";
+}
 
 function doGet(e) {
   return ContentService.createTextOutput(
@@ -385,6 +421,9 @@ function doPost(e) {
     var raw = e.postData ? e.postData.contents : null;
     if (!raw) return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Sin datos" })).setMimeType(ContentService.MimeType.JSON);
     var data = JSON.parse(raw);
+    var expected = getSharedSecret();
+    if (!expected) return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Falta SHARED_SECRET en el script" })).setMimeType(ContentService.MimeType.JSON);
+    if (data.secret !== expected) return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "No autorizado: secreto inválido" })).setMimeType(ContentService.MimeType.JSON);
     var orgName = data.organizationName || "Establecimiento";
     var rootFolderName = "PactaCloud - Actas Oficiales (" + orgName + ")";
     var rootFolder = getOrCreateFolder(DriveApp.getRootFolder(), rootFolderName);
