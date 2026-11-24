@@ -99,30 +99,50 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT OR UPDATE ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- 4. ELIMINAR POLÍTICAS INSEGURAS ABIERTAS PREVIAS
+-- 4. ELIMINAR POLÍTICAS PREVIAS (ABIERTAS O NUEVAS) PARA EVITAR CONFLICTOS
 DROP POLICY IF EXISTS "Permitir insercion/actualizacion" ON public.organizations;
 DROP POLICY IF EXISTS "Permitir lectura para usuarios autenticados o anon" ON public.organizations;
 DROP POLICY IF EXISTS "Permitir lectura organizations" ON public.organizations;
 DROP POLICY IF EXISTS "Permitir mutacion organizations" ON public.organizations;
+DROP POLICY IF EXISTS "org_select_own" ON public.organizations;
+DROP POLICY IF EXISTS "org_update_admin" ON public.organizations;
 
 DROP POLICY IF EXISTS "Permitir mutacion user_profiles" ON public.user_profiles;
 DROP POLICY IF EXISTS "Permitir lectura user_profiles" ON public.user_profiles;
+DROP POLICY IF EXISTS "profiles_select_org" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_update_self" ON public.profiles;
 
 DROP POLICY IF EXISTS "Permitir mutacion directories" ON public.directories;
 DROP POLICY IF EXISTS "Permitir lectura directories" ON public.directories;
+DROP POLICY IF EXISTS "directories_select" ON public.directories;
+DROP POLICY IF EXISTS "directories_insert" ON public.directories;
+DROP POLICY IF EXISTS "directories_update" ON public.directories;
+DROP POLICY IF EXISTS "directories_delete" ON public.directories;
 
 DROP POLICY IF EXISTS "Permitir mutacion attendees" ON public.attendees;
 DROP POLICY IF EXISTS "Permitir lectura attendees" ON public.attendees;
+DROP POLICY IF EXISTS "attendees_select" ON public.attendees;
+DROP POLICY IF EXISTS "attendees_insert" ON public.attendees;
+DROP POLICY IF EXISTS "attendees_update" ON public.attendees;
+DROP POLICY IF EXISTS "attendees_delete" ON public.attendees;
 
 DROP POLICY IF EXISTS "Escritura de actas" ON public.minutes;
 DROP POLICY IF EXISTS "Lectura de actas" ON public.minutes;
 DROP POLICY IF EXISTS "Permitir mutacion minutes" ON public.minutes;
 DROP POLICY IF EXISTS "Permitir lectura minutes" ON public.minutes;
+DROP POLICY IF EXISTS "minutes_select" ON public.minutes;
+DROP POLICY IF EXISTS "minutes_insert" ON public.minutes;
+DROP POLICY IF EXISTS "minutes_update" ON public.minutes;
+DROP POLICY IF EXISTS "minutes_delete" ON public.minutes;
 
 DROP POLICY IF EXISTS "Escritura de compromisos" ON public.action_items;
 DROP POLICY IF EXISTS "Lectura de compromisos" ON public.action_items;
 DROP POLICY IF EXISTS "Permitir mutacion action_items" ON public.action_items;
 DROP POLICY IF EXISTS "Permitir lectura action_items" ON public.action_items;
+DROP POLICY IF EXISTS "action_items_select" ON public.action_items;
+DROP POLICY IF EXISTS "action_items_insert" ON public.action_items;
+DROP POLICY IF EXISTS "action_items_update" ON public.action_items;
+DROP POLICY IF EXISTS "action_items_delete" ON public.action_items;
 
 -- 5. HABILITAR RLS EN TODAS LAS TABLAS
 ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
