@@ -8,6 +8,13 @@
 --    completa el formulario de creación de su institución.
 ALTER TABLE public.profiles ALTER COLUMN organization_id DROP NOT NULL;
 
+-- 1b. Permitir que el usuario siempre pueda leer su propio perfil aunque aún no
+--     tenga organization_id asignado (en SQL, NULL = NULL evalúa a FALSE).
+DROP POLICY IF EXISTS "profiles_select_org" ON public.profiles;
+CREATE POLICY "profiles_select_org" ON public.profiles
+  FOR SELECT TO authenticated
+  USING (id = auth.uid() OR organization_id = public.get_current_user_org_id());
+
 -- 2. Actualizar prevent_profile_tampering para permitir asignar organization_id
 --    únicamente la primera vez (cuando OLD.organization_id IS NULL), bloqueando
 --    cualquier cambio de tenant posterior.

@@ -168,6 +168,27 @@ export default function App() {
         localStorage.setItem('minuteflow_current_org_id', profile.organizationId);
         handleCloudSync(profile.organizationId);
       } else {
+        const orgs = await storageService.getOrganizations();
+        if (orgs.length === 0) {
+          setUserProfile((prev) => ({
+            ...prev,
+            id: userId,
+            email: email,
+            name: email.split('@')[0] || prev.name,
+            organizationId: '',
+            systemRole: 'admin',
+            role: 'Administrador'
+          }));
+          setOrganizations([]);
+          setCurrentOrgId('');
+          setMinutes([]);
+          setActionItems([]);
+          setAllAttendees([]);
+          setDirectories([]);
+          setSchedule([]);
+          setNeedsInstitutionOnboarding(true);
+          return;
+        }
         setUserProfile((prev) => ({
           ...prev,
           id: userId,
