@@ -264,11 +264,9 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Persist data on change (LocalStorage + Supabase Cloud Sync)
+  // Persist data on change (LocalStorage only; Supabase uses granular mutations)
   useEffect(() => {
-    storageService.saveOrganizations(organizations).then((res) => {
-      if (!res.success && res.error) showToast(`Error al guardar organización en nube: ${res.error}`);
-    });
+    storageService.saveOrganizationsLocal(organizations);
   }, [organizations]);
 
   useEffect(() => {
@@ -284,15 +282,11 @@ export default function App() {
   }, [actionItems]);
 
   useEffect(() => {
-    storageService.saveAttendees(allAttendees).then((res) => {
-      if (!res.success && res.error) showToast(`Error al sincronizar asistentes en nube: ${res.error}`);
-    });
+    storageService.saveAttendeesLocal(allAttendees);
   }, [allAttendees]);
 
   useEffect(() => {
-    storageService.saveDirectories(directories).then((res) => {
-      if (!res.success && res.error) showToast(`Error al sincronizar carpetas en nube: ${res.error}`);
-    });
+    storageService.saveDirectoriesLocal(directories);
   }, [directories]);
 
   useEffect(() => {
@@ -337,6 +331,11 @@ export default function App() {
         organizationName: updated.name
       }));
     }
+    storageService.updateSingleOrganization(updated).then((res) => {
+      if (!res.success && res.error) {
+        showToast(`Error al guardar organización en nube: ${res.error}`);
+      }
+    });
   };
 
   // Purgar organizaciones de prueba para dejar únicamente el establecimiento activo del usuario
@@ -408,6 +407,9 @@ export default function App() {
       organizationId: currentOrgId
     };
     setDirectories((prev) => [...prev, newDir]);
+    storageService.saveSingleDirectory(newDir).then((res) => {
+      if (!res.success && res.error) showToast(`Error al crear carpeta en nube: ${res.error}`);
+    });
     showToast(`Carpeta "${trimmed}" creada en ${currentOrganization.name}`);
   };
 
@@ -420,9 +422,13 @@ export default function App() {
     const target = directories.find((d) => d.id === id);
     if (!target) return;
 
+    const updatedDir = { ...target, name: trimmed };
     setDirectories((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, name: trimmed } : d))
+      prev.map((d) => (d.id === id ? updatedDir : d))
     );
+    storageService.saveSingleDirectory(updatedDir).then((res) => {
+      if (!res.success && res.error) showToast(`Error al renombrar carpeta en nube: ${res.error}`);
+    });
 
     // Actualizar las actas asociadas dentro de esta organización
     setMinutes((prev) =>
@@ -451,6 +457,9 @@ export default function App() {
     );
 
     setDirectories((prev) => prev.filter((d) => d.id !== id));
+    storageService.deleteSingleDirectory(id).then((res) => {
+      if (!res.success && res.error) showToast(`Error al eliminar carpeta en nube: ${res.error}`);
+    });
     showToast(`Carpeta "${target.name}" eliminada`);
   };
 
@@ -655,17 +664,28 @@ export default function App() {
 
   // Contact / Directory Operations
   const handleCreateContact = (newContact: Attendee) => {
-    setAllAttendees((prev) => [{ ...newContact, organizationId: currentOrgId }, ...prev]);
+    const scopedContact = { ...newContact, organizationId: currentOrgId };
+    setAllAttendees((prev) => [scopedContact, ...prev]);
+    storageService.saveSingleAttendee(scopedContact).then((res) => {
+      if (!res.success && res.error) showToast(`Error al guardar contacto en nube: ${res.error}`);
+    });
   };
 
   const handleUpdateContact = (updatedContact: Attendee) => {
+    const scopedContact = { ...updatedContact, organizationId: currentOrgId };
     setAllAttendees((prev) =>
-      prev.map((c) => (c.id === updatedContact.id ? { ...updatedContact, organizationId: currentOrgId } : c))
+      prev.map((c) => (c.id === updatedContact.id ? scopedContact : c))
     );
+    storageService.saveSingleAttendee(scopedContact).then((res) => {
+      if (!res.success && res.error) showToast(`Error al actualizar contacto en nube: ${res.error}`);
+    });
   };
 
   const handleDeleteContact = (id: string) => {
     setAllAttendees((prev) => prev.filter((c) => c.id !== id));
+    storageService.deleteSingleAttendee(id).then((res) => {
+      if (!res.success && res.error) showToast(`Error al eliminar contacto en nube: ${res.error}`);
+    });
   };
 
   const handleResetContacts = () => {

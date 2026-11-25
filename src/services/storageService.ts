@@ -79,36 +79,42 @@ export const storageService = {
     return safeJsonParse<Organization[]>(saved, INITIAL_ORGANIZATIONS);
   },
 
-  async saveOrganizations(orgs: Organization[]): Promise<StorageMutationResult> {
+  saveOrganizationsLocal(orgs: Organization[]): void {
     localStorage.setItem('minuteflow_organizations', JSON.stringify(orgs));
+  },
 
-    if (isSupabaseConfigured()) {
-      const supabase = getSupabase();
-      if (supabase) {
-        const rows = orgs.map((o) => ({
-          id: o.id,
-          name: o.name,
-          code: o.code,
-          tax_id: o.taxId,
-          domain: o.domain,
-          drive_account: o.driveAccount,
-          drive_webhook_url: o.driveWebhookUrl,
-          logo_url: o.logoUrl,
-          plan: o.plan,
-          primary_color: o.primaryColor,
-          secondary_color: o.secondaryColor,
-          slogan: o.slogan,
-          header_text: o.headerText,
-          address: o.address
-        }));
+  async updateSingleOrganization(org: Organization): Promise<StorageMutationResult> {
+    if (!isSupabaseConfigured()) return { success: true };
+    const supabase = getSupabase();
+    if (!supabase) return { success: true };
 
-        if (rows.length > 0) {
-          return execSupabaseWrite('saveOrganizations', () =>
-            supabase.from('organizations').upsert(rows)
-          );
-        }
-      }
-    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { success: true };
+
+    return execSupabaseWrite('updateSingleOrganization', () =>
+      supabase
+        .from('organizations')
+        .update({
+          name: org.name,
+          code: org.code,
+          tax_id: org.taxId,
+          domain: org.domain,
+          drive_account: org.driveAccount,
+          drive_webhook_url: org.driveWebhookUrl,
+          logo_url: org.logoUrl,
+          plan: org.plan,
+          primary_color: org.primaryColor,
+          secondary_color: org.secondaryColor,
+          slogan: org.slogan,
+          header_text: org.headerText,
+          address: org.address
+        })
+        .eq('id', org.id)
+    );
+  },
+
+  async saveOrganizations(orgs: Organization[]): Promise<StorageMutationResult> {
+    this.saveOrganizationsLocal(orgs);
     return { success: true };
   },
 
@@ -427,28 +433,45 @@ export const storageService = {
     return all.filter((a) => (a.organizationId || 'org-redq') === orgId);
   },
 
-  async saveAttendees(attendees: Attendee[]): Promise<StorageMutationResult> {
+  saveAttendeesLocal(attendees: Attendee[]): void {
     localStorage.setItem('minuteflow_attendees', JSON.stringify(attendees));
+  },
 
-    if (isSupabaseConfigured()) {
-      const supabase = getSupabase();
-      if (supabase) {
-        const rows = attendees.map((att) => ({
-          id: att.id,
-          organization_id: att.organizationId || 'org-redq',
-          name: att.name,
-          email: att.email,
-          role: att.role || 'Miembro',
-          avatar_url: att.avatarUrl || null
-        }));
+  async saveSingleAttendee(att: Attendee): Promise<StorageMutationResult> {
+    if (!isSupabaseConfigured()) return { success: true };
+    const supabase = getSupabase();
+    if (!supabase) return { success: true };
 
-        if (rows.length > 0) {
-          return execSupabaseWrite('saveAttendees', () =>
-            supabase.from('attendees').upsert(rows)
-          );
-        }
-      }
-    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { success: true };
+
+    return execSupabaseWrite('saveSingleAttendee', () =>
+      supabase.from('attendees').upsert({
+        id: att.id,
+        organization_id: att.organizationId || 'org-redq',
+        name: att.name,
+        email: att.email,
+        role: att.role || 'Miembro',
+        avatar_url: att.avatarUrl || null
+      })
+    );
+  },
+
+  async deleteSingleAttendee(id: string): Promise<StorageMutationResult> {
+    if (!isSupabaseConfigured()) return { success: true };
+    const supabase = getSupabase();
+    if (!supabase) return { success: true };
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { success: true };
+
+    return execSupabaseWrite('deleteSingleAttendee', () =>
+      supabase.from('attendees').delete().eq('id', id)
+    );
+  },
+
+  async saveAttendees(attendees: Attendee[]): Promise<StorageMutationResult> {
+    this.saveAttendeesLocal(attendees);
     return { success: true };
   },
 
@@ -486,26 +509,43 @@ export const storageService = {
     return all.filter((d) => (d.organizationId || 'org-redq') === orgId);
   },
 
-  async saveDirectories(directories: DirectoryItem[]): Promise<StorageMutationResult> {
+  saveDirectoriesLocal(directories: DirectoryItem[]): void {
     localStorage.setItem('minuteflow_directories', JSON.stringify(directories));
+  },
 
-    if (isSupabaseConfigured()) {
-      const supabase = getSupabase();
-      if (supabase) {
-        const rows = directories.map((d) => ({
-          id: d.id,
-          organization_id: d.organizationId || 'org-redq',
-          name: d.name,
-          color: '#4f46e5'
-        }));
+  async saveSingleDirectory(dir: DirectoryItem): Promise<StorageMutationResult> {
+    if (!isSupabaseConfigured()) return { success: true };
+    const supabase = getSupabase();
+    if (!supabase) return { success: true };
 
-        if (rows.length > 0) {
-          return execSupabaseWrite('saveDirectories', () =>
-            supabase.from('directories').upsert(rows)
-          );
-        }
-      }
-    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { success: true };
+
+    return execSupabaseWrite('saveSingleDirectory', () =>
+      supabase.from('directories').upsert({
+        id: dir.id,
+        organization_id: dir.organizationId || 'org-redq',
+        name: dir.name,
+        color: '#4f46e5'
+      })
+    );
+  },
+
+  async deleteSingleDirectory(id: string): Promise<StorageMutationResult> {
+    if (!isSupabaseConfigured()) return { success: true };
+    const supabase = getSupabase();
+    if (!supabase) return { success: true };
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { success: true };
+
+    return execSupabaseWrite('deleteSingleDirectory', () =>
+      supabase.from('directories').delete().eq('id', id)
+    );
+  },
+
+  async saveDirectories(directories: DirectoryItem[]): Promise<StorageMutationResult> {
+    this.saveDirectoriesLocal(directories);
     return { success: true };
   },
 
