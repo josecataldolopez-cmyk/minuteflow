@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { TopAppBar } from './components/TopAppBar';
 import { DashboardView } from './components/DashboardView';
+import { AuthGateScreen } from './components/AuthGateScreen';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Toast } from './components/Toast';
 
@@ -115,31 +116,47 @@ export default function App() {
   // Supabase Auth State (Fase 1: Identidad & Tenancy Real)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState(() => isSupabaseConfigured());
   const [needsInstitutionOnboarding, setNeedsInstitutionOnboarding] = useState(false);
   const [scheduledMinuteNotification, setScheduledMinuteNotification] = useState<MeetingMinute | null>(null);
 
   // Monitor Supabase Authentication
   useEffect(() => {
-    if (!isSupabaseConfigured()) return;
+    if (!isSupabaseConfigured()) {
+      setIsAuthChecking(false);
+      return;
+    }
     const supabase = getSupabase();
-    if (!supabase) return;
+    if (!supabase) {
+      setIsAuthChecking(false);
+      return;
+    }
 
     // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setIsAuthenticated(true);
-        handleFetchUserProfileFromAuth(session.user.id, session.user.email || '');
-      }
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (session?.user) {
+          setIsAuthenticated(true);
+          setIsDemoMode(false);
+          handleFetchUserProfileFromAuth(session.user.id, session.user.email || '');
+        }
+      })
+      .finally(() => {
+        setIsAuthChecking(false);
+      });
 
     // Listen to changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setIsAuthenticated(true);
+        setIsDemoMode(false);
         handleFetchUserProfileFromAuth(session.user.id, session.user.email || '');
       } else {
         setIsAuthenticated(false);
         if (event === 'SIGNED_OUT') {
+          setIsDemoMode(false);
           clearSessionData();
         }
       }
@@ -240,6 +257,25 @@ export default function App() {
     });
   };
 
+  const handleEnterDemoMode = () => {
+    setOrganizations(INITIAL_ORGANIZATIONS);
+    setCurrentOrgId('org-redq');
+    setMinutes(INITIAL_MINUTES);
+    setActionItems(INITIAL_ACTION_ITEMS);
+    setAllAttendees(INITIAL_ATTENDEES);
+    setDirectories(INITIAL_DIRECTORIES);
+    setSchedule(INITIAL_SCHEDULE);
+    setUserProfile(INITIAL_USER_PROFILE);
+    setCurrentView('dashboard');
+    setIsDemoMode(true);
+    showToast('Modo Demo Local activado (sin respaldo en la nube)');
+  };
+
+  const handleExitDemoMode = () => {
+    setIsDemoMode(false);
+    clearSessionData();
+  };
+
   const handleSignOut = async () => {
     if (isSupabaseConfigured()) {
       const supabase = getSupabase();
@@ -248,8 +284,8 @@ export default function App() {
       }
     }
     setIsAuthenticated(false);
+    setIsDemoMode(false);
     clearSessionData();
-    setIsAuthModalOpen(true);
     showToast('Sesión cerrada y datos locales limpiados');
   };
 
@@ -828,6 +864,63 @@ export default function App() {
     handleCloudSync(currentOrgId);
   };
 
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen w-full bg-slate-50 flex flex-col items-center justify-center gap-3 text-slate-600">
+        <span aria-hidden="true" className="material-symbols-outlined animate-spin text-indigo-600 text-[32px]">
+          progress_activity
+        </span>
+        <p className="text-sm font-semibold">Verificando sesión segura...</p>
+      </div>
+    );
+  }
+
+  if (isSupabaseConfigured() && !isAuthenticated && !isDemoMode) {
+    return (
+      <>
+        <AuthGateScreen
+          onOpenAuthModal={() => setIsAuthModalOpen(true)}
+          onEnterDemoMode={handleEnterDemoMode}
+          onOpenPrivacy={() => {
+            setPrivacyModalTab('privacy');
+            setIsPrivacyModalOpen(true);
+          }}
+          onOpenTerms={() => {
+            setPrivacyModalTab('terms');
+            setIsPrivacyModalOpen(true);
+          }}
+        />
+        <Suspense fallback={null}>
+          <AuthModal
+            isOpen={isAuthModalOpen}
+            onClose={() => setIsAuthModalOpen(false)}
+            availableOrganizations={organizations}
+            onAuthSuccess={(userEmail, orgId) => {
+              setIsAuthenticated(true);
+              setIsDemoMode(false);
+              showToast(`¡Bienvenido a PactaCloud, ${userEmail}!`);
+              if (orgId) {
+                setCurrentOrgId(orgId);
+                localStorage.setItem('minuteflow_current_org_id', orgId);
+              }
+            }}
+          />
+          <PrivacyPolicyModal
+            isOpen={isPrivacyModalOpen}
+            onClose={() => {
+              setIsPrivacyModalOpen(false);
+              if (window.location.hash) {
+                history.replaceState(null, '', window.location.pathname);
+              }
+            }}
+            defaultTab={privacyModalTab}
+          />
+        </Suspense>
+        <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
+      </>
+    );
+  }
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-800 font-sans antialiased">
       {/* Desktop Side Navigation Bar */}
@@ -846,6 +939,21 @@ export default function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
+        {isDemoMode && (
+          <div className="bg-amber-400 text-slate-950 px-4 py-1.5 text-xs font-bold flex items-center justify-between gap-2 shrink-0">
+            <div className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">visibility</span>
+              <span>Modo Demo Local — Los cambios se guardan solo en este navegador y no en la nube.</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleExitDemoMode}
+              className="px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-800 text-[11px] font-bold cursor-pointer shrink-0"
+            >
+              Salir de Demo / Iniciar Sesión
+            </button>
+          </div>
+        )}
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-indigo-600 focus:text-white focus:rounded-xl focus:text-xs focus:font-bold"
