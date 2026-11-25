@@ -49,25 +49,28 @@ export const storageService = {
       const supabase = getSupabase();
       if (supabase) {
         try {
-          const { data, error } = await supabase.from('organizations').select('*');
-          if (!error && data && data.length > 0) {
-            return data.map((o: any) => ({
-              id: o.id,
-              name: o.name,
-              code: o.code,
-              taxId: o.tax_id,
-              domain: o.domain,
-              driveAccount: o.drive_account,
-              driveWebhookUrl: o.drive_webhook_url,
-              logoUrl: o.logo_url,
-              plan: o.plan,
-              createdAt: o.created_at,
-              primaryColor: o.primary_color || '#4f46e5',
-              secondaryColor: o.secondary_color,
-              slogan: o.slogan,
-              headerText: o.header_text,
-              address: o.address
-            }));
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            const { data, error } = await supabase.from('organizations').select('*');
+            if (!error && data) {
+              return data.map((o: any) => ({
+                id: o.id,
+                name: o.name,
+                code: o.code,
+                taxId: o.tax_id,
+                domain: o.domain,
+                driveAccount: o.drive_account,
+                driveWebhookUrl: o.drive_webhook_url,
+                logoUrl: o.logo_url,
+                plan: o.plan,
+                createdAt: o.created_at,
+                primaryColor: o.primary_color || '#4f46e5',
+                secondaryColor: o.secondary_color,
+                slogan: o.slogan,
+                headerText: o.header_text,
+                address: o.address
+              }));
+            }
           }
         } catch (err) {
           console.warn('Fallback a localStorage para organizaciones:', err);
@@ -77,6 +80,65 @@ export const storageService = {
 
     const saved = localStorage.getItem('minuteflow_organizations');
     return safeJsonParse<Organization[]>(saved, INITIAL_ORGANIZATIONS);
+  },
+
+  async createMyOrganizationOnboarding(params: {
+    name: string;
+    code: string;
+    taxId?: string;
+    address?: string;
+    slogan?: string;
+    primaryColor?: string;
+  }): Promise<{ success: boolean; organization?: Organization; error?: string }> {
+    if (!isSupabaseConfigured()) {
+      const localOrg: Organization = {
+        id: `org-${Date.now()}`,
+        name: params.name.trim(),
+        code: params.code.trim().toUpperCase(),
+        taxId: params.taxId?.trim(),
+        address: params.address?.trim(),
+        slogan: params.slogan?.trim(),
+        primaryColor: params.primaryColor || '#4f46e5',
+        driveAccount: '',
+        domain: '',
+        plan: 'ENTERPRISE',
+      };
+      return { success: true, organization: localOrg };
+    }
+
+    const supabase = getSupabase();
+    if (!supabase) return { success: false, error: 'Cliente Supabase no disponible' };
+
+    const { data, error } = await supabase.rpc('create_my_organization', {
+      p_name: params.name.trim(),
+      p_code: params.code.trim().toUpperCase(),
+      p_tax_id: params.taxId?.trim() || null,
+      p_address: params.address?.trim() || null,
+      p_slogan: params.slogan?.trim() || null,
+      p_primary_color: params.primaryColor || '#4f46e5',
+    });
+
+    if (error || !data) {
+      return { success: false, error: error?.message || 'No se pudo crear la institución' };
+    }
+
+    const org: Organization = {
+      id: data.id,
+      name: data.name,
+      code: data.code,
+      taxId: data.tax_id,
+      domain: data.domain || '',
+      driveAccount: data.drive_account || '',
+      driveWebhookUrl: data.drive_webhook_url,
+      logoUrl: data.logo_url,
+      plan: data.plan || 'ENTERPRISE',
+      primaryColor: data.primary_color || '#4f46e5',
+      secondaryColor: data.secondary_color,
+      slogan: data.slogan,
+      headerText: data.header_text,
+      address: data.address,
+    };
+    return { success: true, organization: org };
   },
 
   saveOrganizationsLocal(orgs: Organization[]): void {
@@ -589,6 +651,7 @@ export const storageService = {
   async syncAll(orgId: string): Promise<{
     success: boolean;
     message: string;
+    organizations: Organization[];
     minutes: MeetingMinute[];
     actionItems: ActionItem[];
     attendees: Attendee[];
@@ -598,6 +661,7 @@ export const storageService = {
       return {
         success: false,
         message: 'Supabase no está configurado. Operando con caché local.',
+        organizations: await this.getOrganizations(),
         minutes: await this.getMinutes(orgId),
         actionItems: await this.getActionItems(orgId),
         attendees: await this.getAttendees(orgId),
@@ -606,7 +670,8 @@ export const storageService = {
     }
 
     try {
-      const [minutes, actionItems, attendees, directories] = await Promise.all([
+      const [organizations, minutes, actionItems, attendees, directories] = await Promise.all([
+        this.getOrganizations(),
         this.getMinutes(orgId),
         this.getActionItems(orgId),
         this.getAttendees(orgId),
@@ -616,6 +681,7 @@ export const storageService = {
       return {
         success: true,
         message: `Sincronización completa: ${minutes.length} actas y ${actionItems.length} compromisos verificados.`,
+        organizations,
         minutes,
         actionItems,
         attendees,
@@ -626,6 +692,7 @@ export const storageService = {
       return {
         success: false,
         message: msg,
+        organizations: await this.getOrganizations(),
         minutes: await this.getMinutes(orgId),
         actionItems: await this.getActionItems(orgId),
         attendees: await this.getAttendees(orgId),

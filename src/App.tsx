@@ -11,6 +11,7 @@ const ExportShareModal = lazy(() => import('./components/ExportShareModal').then
 const SettingsView = lazy(() => import('./components/SettingsView').then((m) => ({ default: m.SettingsView })));
 const PrivacyPolicyModal = lazy(() => import('./components/PrivacyPolicyModal').then((m) => ({ default: m.PrivacyPolicyModal })));
 const AuthModal = lazy(() => import('./components/AuthModal').then((m) => ({ default: m.AuthModal })));
+const InstitutionOnboardingModal = lazy(() => import('./components/InstitutionOnboardingModal').then((m) => ({ default: m.InstitutionOnboardingModal })));
 import { storageService } from './services/storageService';
 import { getSupabase, isSupabaseConfigured } from './services/supabaseClient';
 import { openGoogleCalendarEvent, downloadIcsFile } from './services/calendarService';
@@ -113,6 +114,7 @@ export default function App() {
   // Supabase Auth State (Fase 1: Identidad & Tenancy Real)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [needsInstitutionOnboarding, setNeedsInstitutionOnboarding] = useState(false);
   const [scheduledMinuteNotification, setScheduledMinuteNotification] = useState<MeetingMinute | null>(null);
 
   // Monitor Supabase Authentication
@@ -145,14 +147,26 @@ export default function App() {
   const handleFetchUserProfileFromAuth = async (userId: string, email: string) => {
     try {
       const profile = await storageService.getProfileFromSupabase(userId);
-      if (profile) {
+      if (profile && !profile.organizationId) {
+        // Usuario nuevo sin institución: limpiar datos demo y abrir onboarding
         setUserProfile(profile);
-        const targetOrg = profile.organizationId || currentOrgId;
-        if (profile.organizationId) {
-          setCurrentOrgId(profile.organizationId);
-          localStorage.setItem('minuteflow_current_org_id', profile.organizationId);
-        }
-        handleCloudSync(targetOrg);
+        setOrganizations([]);
+        setCurrentOrgId('');
+        setMinutes([]);
+        setActionItems([]);
+        setAllAttendees([]);
+        setDirectories([]);
+        setSchedule([]);
+        setNeedsInstitutionOnboarding(true);
+        return;
+      }
+
+      if (profile && profile.organizationId) {
+        setNeedsInstitutionOnboarding(false);
+        setUserProfile(profile);
+        setCurrentOrgId(profile.organizationId);
+        localStorage.setItem('minuteflow_current_org_id', profile.organizationId);
+        handleCloudSync(profile.organizationId);
       } else {
         setUserProfile((prev) => ({
           ...prev,
@@ -175,6 +189,7 @@ export default function App() {
       }
     }
     setIsAuthenticated(false);
+    setNeedsInstitutionOnboarding(false);
     showToast('Sesión cerrada exitosamente');
   };
 
@@ -240,7 +255,7 @@ export default function App() {
     return INITIAL_ATTENDEES;
   });
 
-  const [schedule] = useState(INITIAL_SCHEDULE);
+  const [schedule, setSchedule] = useState(INITIAL_SCHEDULE);
 
   const [directories, setDirectories] = useState<DirectoryItem[]>(() => {
     const saved = localStorage.getItem('minuteflow_directories');
@@ -721,18 +736,14 @@ export default function App() {
     try {
       const syncResult = await storageService.syncAll(orgId);
       if (syncResult.success) {
-        if (syncResult.minutes.length > 0) {
-          setMinutes(syncResult.minutes);
+        if (syncResult.organizations.length > 0) {
+          setOrganizations(syncResult.organizations);
         }
-        if (syncResult.actionItems.length > 0) {
-          setActionItems(syncResult.actionItems);
-        }
-        if (syncResult.attendees.length > 0) {
-          setAllAttendees(syncResult.attendees);
-        }
-        if (syncResult.directories.length > 0) {
-          setDirectories(syncResult.directories);
-        }
+        setMinutes(syncResult.minutes);
+        setActionItems(syncResult.actionItems);
+        setAllAttendees(syncResult.attendees);
+        setDirectories(syncResult.directories);
+        setSchedule([]);
       }
       showToast(syncResult.message);
     } catch {
@@ -970,6 +981,39 @@ export default function App() {
               setCurrentOrgId(orgId);
               localStorage.setItem('minuteflow_current_org_id', orgId);
             }
+          }}
+        />
+
+        {/* Onboarding de Nueva Institución (Espacio en blanco) */}
+        <InstitutionOnboardingModal
+          isOpen={needsInstitutionOnboarding}
+          userEmail={userProfile.email}
+          onComplete={(newOrg) => {
+            setOrganizations([newOrg]);
+            setCurrentOrgId(newOrg.id);
+            localStorage.setItem('minuteflow_current_org_id', newOrg.id);
+            setMinutes([]);
+            setActionItems([]);
+            setAllAttendees([]);
+            setSchedule([]);
+            setDirectories([
+              {
+                id: `dir-${Date.now()}`,
+                name: 'Actas Generales',
+                count: 0,
+                icon: 'folder',
+                organizationId: newOrg.id,
+              },
+            ]);
+            setUserProfile((prev) => ({
+              ...prev,
+              organizationId: newOrg.id,
+              organizationName: newOrg.name,
+              role: 'Administrador',
+              systemRole: 'admin',
+            }));
+            setNeedsInstitutionOnboarding(false);
+            showToast(`¡Institución "${newOrg.name}" creada con éxito!`);
           }}
         />
 
