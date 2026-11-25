@@ -91,7 +91,7 @@ function simulateAIEnhancement(rawContent: string, contextTitle?: string): AIAna
       lower.includes('enviar')
     ) {
       actionItems.push({
-        text: line.replace(/^[•\-\*]\s*/, '').replace(/^(tarea|compromiso):\s*/i, ''),
+        text: line.replace(/^[•\-*]\s*/, '').replace(/^(tarea|compromiso):\s*/i, ''),
         dueDate: defaultDueDate,
         priority: lower.includes('urgente') || lower.includes('inmediato') ? 'High' : 'Medium'
       });
@@ -101,7 +101,7 @@ function simulateAIEnhancement(rawContent: string, contextTitle?: string): AIAna
   });
 
   return {
-    title: contextTitle || (lines[0] ? lines[0].replace(/^[#•\-\*]\s*/, '').slice(0, 60) : 'Sesión Extraordinaria de Directorio'),
+    title: contextTitle || (lines[0] ? lines[0].replace(/^[#•\-*]\s*/, '').slice(0, 60) : 'Sesión Extraordinaria de Directorio'),
     objectives: 'Consolidar y aprobar los acuerdos estratégicos, prioridades operativas y compromisos de seguimiento derivados de la reunión.',
     pointsTreated: extractedPoints.length > 0 
       ? extractedPoints.join('\n') 

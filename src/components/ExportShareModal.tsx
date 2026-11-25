@@ -48,9 +48,7 @@ export const ExportShareModal: React.FC<ExportShareModalProps> = ({
   const [newSubfolderName, setNewSubfolderName] = useState('');
   const [isCreatingSubfolder, setIsCreatingSubfolder] = useState(false);
 
-  if (!isOpen || !minute) return null;
-
-  const orgId = minute.organizationId || currentOrganization?.id || 'org-redq';
+  const orgId = minute?.organizationId || currentOrganization?.id || 'org-redq';
   const orgName = currentOrganization?.name || 'Establecimiento Principal';
   const targetDriveAccount = currentOrganization?.driveAccount || getOrgDriveAccount(orgId);
   const hasWebhook = Boolean(currentOrganization?.driveWebhookUrl || getOrgDriveWebhookUrl(orgId));
@@ -63,6 +61,8 @@ export const ExportShareModal: React.FC<ExportShareModalProps> = ({
     setOauthConnected(isDriveOAuthConnected(orgId));
     setActiveOAuthEmail(getDriveOAuthAccount(orgId) || targetDriveAccount);
   }, [orgId, targetDriveAccount]);
+
+  if (!isOpen || !minute) return null;
 
   const handleConnectGoogleInModal = async () => {
     setIsConnectingGoogleModal(true);

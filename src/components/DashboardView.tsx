@@ -408,7 +408,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           {minute.title}
                         </h4>
                         <p className="text-xs text-slate-500 line-clamp-2 pl-2 mb-4 leading-relaxed">
-                          {minute.pointsTreated.split('\n')[0]?.replace(/^[•\-\*]\s*/, '') ||
+                          {minute.pointsTreated.split('\n')[0]?.replace(/^[•\-*]\s*/, '') ||
                             minute.objectives ||
                             'Puntos de acuerdo capturados durante la reunión ejecutiva.'}
                         </p>

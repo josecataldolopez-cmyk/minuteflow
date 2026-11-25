@@ -147,7 +147,9 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
       }
       try {
         speechRecognitionRef.current?.stop();
-      } catch {}
+      } catch {
+        // Ignore stop errors on unmount
+      }
     };
   }, []);
 
@@ -177,7 +179,9 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
       }
       try {
         speechRecognitionRef.current?.stop();
-      } catch (e) {}
+      } catch {
+        // Ignore stop errors
+      }
     } else {
       setIsListening(true);
       setShowTranscriptionBox(true);
@@ -318,7 +322,7 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
         .split('\n')
         .filter((l) => l.trim().length > 0)
         .slice(0, 4)
-        .map((l) => l.replace(/^[•\-\*]\s*/, '')),
+        .map((l) => l.replace(/^[•\-*]\s*/, '')),
       actionItems: actionItems.filter((a) => a.text.trim().length > 0),
       attendees,
       nextSessionDate,
