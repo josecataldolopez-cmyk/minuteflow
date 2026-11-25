@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "PactaCloud - Actas y Compromisos",
+  "version": "2.0.0",
+  "description": "Panel lateral para redactar actas oficiales con IA, exportar a PDF y agendar en Google Calendar durante tus reuniones.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Abrir PactaCloud",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "index.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "sidePanel",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://pactacloud.vercel.app/*",
+    "https://*.supabase.co/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

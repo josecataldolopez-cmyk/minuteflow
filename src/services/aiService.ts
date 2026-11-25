@@ -39,7 +39,12 @@ export async function analyzeAndEnhanceMinute(
       }
     }
 
-    const serverRes = await fetch('/api/enhance', {
+    const apiBase =
+      typeof window !== 'undefined' && window.location.protocol === 'chrome-extension:'
+        ? ((import.meta.env.VITE_APP_ORIGIN as string) || 'https://pactacloud.vercel.app')
+        : '';
+
+    const serverRes = await fetch(`${apiBase}/api/enhance`, {
       method: 'POST',
       headers,
       signal: AbortSignal.timeout(15000),
