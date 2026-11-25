@@ -786,24 +786,28 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                             {minute.status}
                           </span>
                         </td>
-                        <td className="p-3 text-slate-400 hidden md:table-cell">
+                        <td className="p-3 text-slate-600 hidden md:table-cell">
                           {minute.formattedDate}
                         </td>
                         <td className="p-3 text-right">
                           <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                             <button
+                              type="button"
                               onClick={() => onOpenExport(minute)}
-                              className="p-1 text-indigo-600 hover:bg-indigo-50 rounded-lg cursor-pointer"
+                              aria-label={`Exportar acta ${minute.title}`}
+                              className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center text-indigo-600 hover:bg-indigo-50 rounded-lg cursor-pointer"
                               title="Exportar"
                             >
-                              <span className="material-symbols-outlined text-[18px]">ios_share</span>
+                              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">ios_share</span>
                             </button>
                             <button
+                              type="button"
                               onClick={() => setMinuteToDelete(minute)}
-                              className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer"
+                              aria-label={`Eliminar acta ${minute.title}`}
+                              className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
                               title="Eliminar"
                             >
-                              <span className="material-symbols-outlined text-[18px]">delete</span>
+                              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">delete</span>
                             </button>
                           </div>
                         </td>

@@ -140,28 +140,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="auth-modal-title"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
+    >
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="px-6 pt-6 pb-4 bg-gradient-to-b from-indigo-50/50 to-white border-b border-slate-100 flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
-              <span className="material-symbols-outlined text-[22px]">verified_user</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[22px]">verified_user</span>
             </div>
             <div>
-              <h3 className="font-extrabold text-slate-900 text-base tracking-tight">
+              <h2 id="auth-modal-title" className="font-extrabold text-slate-900 text-base tracking-tight">
                 {mode === 'signin' ? 'Acceso a PactaCloud' : 'Crear Cuenta Institucional'}
-              </h3>
+              </h2>
               <p className="text-xs text-slate-500">
                 Aislamiento estricto de datos con Supabase Auth
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+            aria-label="Cerrar ventana de acceso"
+            className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[20px]">close</span>
+            <span aria-hidden="true" className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
 
@@ -253,8 +260,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <form onSubmit={handleEmailAuth} className="space-y-3">
             {mode === 'signup' && (
               <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-1">Nombre Completo:</label>
+                <label htmlFor="auth-fullname" className="text-[11px] font-bold text-slate-700 block mb-1">Nombre Completo:</label>
                 <input
+                  id="auth-fullname"
                   type="text"
                   required
                   value={fullName}
@@ -266,8 +274,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             )}
 
             <div>
-              <label className="text-[11px] font-bold text-slate-700 block mb-1">Correo Institucional:</label>
+              <label htmlFor="auth-email" className="text-[11px] font-bold text-slate-700 block mb-1">Correo Institucional:</label>
               <input
+                id="auth-email"
                 type="email"
                 required
                 value={email}
@@ -278,8 +287,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
 
             <div>
-              <label className="text-[11px] font-bold text-slate-700 block mb-1">Contraseña:</label>
+              <label htmlFor="auth-password" className="text-[11px] font-bold text-slate-700 block mb-1">Contraseña:</label>
               <input
+                id="auth-password"
                 type="password"
                 required
                 minLength={6}
@@ -292,8 +302,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             {mode === 'signup' && (
               <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-1">Código de invitación:</label>
+                <label htmlFor="auth-invite-code" className="text-[11px] font-bold text-slate-700 block mb-1">Código de invitación:</label>
                 <input
+                  id="auth-invite-code"
                   type="text"
                   required
                   value={inviteCode}

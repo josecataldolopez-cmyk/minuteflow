@@ -720,8 +720,9 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
                 Próxima Sesión y Sincronización
               </h2>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-600">Fecha de Próxima Reunión</label>
+                <label htmlFor="next-session-date" className="text-xs font-semibold text-slate-600">Fecha de Próxima Reunión</label>
                 <input
+                  id="next-session-date"
                   type="date"
                   value={nextSessionDate}
                   onChange={(e) => setNextSessionDate(e.target.value)}
@@ -766,11 +767,11 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
                       };
                       openGoogleCalendarEvent(tempMinute, currentOrganization?.name);
                     }}
-                    className="w-full py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                    className="w-full py-2.5 px-3 rounded-xl bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
                   >
-                    <span className="material-symbols-outlined text-[17px]">calendar_month</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[17px]">calendar_month</span>
                     <span>Abrir y Agendar en Google Calendar</span>
-                    <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+                    <span aria-hidden="true" className="material-symbols-outlined text-[13px]">open_in_new</span>
                   </button>
                   <p className="text-[10px] text-slate-500 text-center leading-tight">
                     Abre Google Calendar e invita automáticamente a {attendees.filter(a => a.email && a.email.includes('@')).length} asistentes

@@ -764,6 +764,12 @@ export default function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-indigo-600 focus:text-white focus:rounded-xl focus:text-xs focus:font-bold"
+        >
+          Saltar al contenido principal
+        </a>
         {/* Top App Bar with Multi-Tenant Organization Switcher */}
         <TopAppBar
           searchQuery={searchQuery}
@@ -783,6 +789,7 @@ export default function App() {
         />
 
         {/* Dynamic Views (Strictly scoped by organization) */}
+        <main id="main-content" className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <ErrorBoundary fallbackTitle="Inconveniente en la vista principal">
           <Suspense
             fallback={
@@ -873,6 +880,7 @@ export default function App() {
             )}
           </Suspense>
         </ErrorBoundary>
+        </main>
 
         {/* Mobile Bottom Navigation Bar */}
         <nav className="md:hidden w-full h-16 bg-white border-t border-slate-200/80 flex justify-around items-center px-2 flex-shrink-0 z-30 pb-1 shadow-xs">
@@ -980,18 +988,23 @@ export default function App() {
 
       {/* Floating Google Calendar Notification Banner */}
       {scheduledMinuteNotification && (
-        <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full bg-slate-900 text-white rounded-2xl p-4 shadow-2xl border border-slate-700 animate-in slide-in-from-bottom-5">
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 right-6 z-50 max-w-sm w-full bg-slate-900 text-white rounded-2xl p-4 shadow-2xl border border-slate-700 animate-in slide-in-from-bottom-5"
+        >
           <div className="flex items-start justify-between gap-3 mb-2">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-amber-400 text-[22px]">calendar_month</span>
-              <h4 className="text-sm font-bold text-white">Próxima Sesión Programada</h4>
+              <span aria-hidden="true" className="material-symbols-outlined text-amber-400 text-[22px]">calendar_month</span>
+              <h2 className="text-sm font-bold text-white">Próxima Sesión Programada</h2>
             </div>
             <button
               type="button"
               onClick={() => setScheduledMinuteNotification(null)}
-              className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
+              aria-label="Cerrar aviso de Google Calendar"
+              className="text-slate-300 hover:text-white p-1.5 rounded-lg cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[18px]">close</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">close</span>
             </button>
           </div>
           <p className="text-xs text-slate-300 mb-3 truncate">
@@ -1008,11 +1021,11 @@ export default function App() {
                 openGoogleCalendarEvent(scheduledMinuteNotification, currentOrganization.name);
                 setScheduledMinuteNotification(null);
               }}
-              className="flex-1 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-all"
+              className="flex-1 py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-all"
             >
-              <span className="material-symbols-outlined text-[16px]">calendar_month</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">calendar_month</span>
               <span>Abrir en Google Calendar</span>
-              <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[12px]">open_in_new</span>
             </button>
             <button
               type="button"

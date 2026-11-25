@@ -69,9 +69,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Welcome Briefing Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
               <span>Bienvenida/o de nuevo, {firstName}</span>
-            </h2>
+            </h1>
             <p className="text-sm text-slate-500 mt-1">
               {userProfile.role} • {userProfile.department || 'Dirección General'} — Este es tu resumen ejecutivo y calendario de compromisos.
             </p>
@@ -241,8 +241,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Fecha límite</label>
+                        <label htmlFor="quick-action-date" className="text-[10px] font-semibold text-slate-600 block mb-0.5">Fecha límite</label>
                         <input
+                          id="quick-action-date"
                           type="date"
                           value={newActionDueDate}
                           onChange={(e) => setNewActionDueDate(e.target.value)}
@@ -250,8 +251,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Prioridad</label>
+                        <label htmlFor="quick-action-priority" className="text-[10px] font-semibold text-slate-600 block mb-0.5">Prioridad</label>
                         <select
+                          id="quick-action-priority"
                           value={newActionPriority}
                           onChange={(e) => setNewActionPriority(e.target.value as any)}
                           className="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 outline-none focus:border-indigo-600 font-medium cursor-pointer"
