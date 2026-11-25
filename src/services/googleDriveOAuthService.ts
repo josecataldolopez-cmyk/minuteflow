@@ -449,41 +449,55 @@ function escapeHtml(str?: string): string {
  * Genera el documento HTML enriquecido con membrete, logo y estructura oficial
  * para que Google Drive lo convierta automáticamente en un Google Doc profesional.
  */
-function generateMinuteHTML(minute: MeetingMinute, organization?: Organization): string {
+export function generateMinuteHTML(minute: MeetingMinute, organization?: Organization): string {
   const orgName = escapeHtml(organization?.name || 'PactaCloud');
   const slogan = escapeHtml(organization?.slogan || '');
   const headerText = escapeHtml(organization?.headerText || 'DOCUMENTO OFICIAL DE REUNIÓN');
+  const taxId = escapeHtml(organization?.taxId || '');
+  const address = escapeHtml(organization?.address || '');
   const primaryColor = organization?.primaryColor || '#4f46e5';
 
   return `
     <!DOCTYPE html>
-    <html>
+    <html lang="es">
       <head>
         <meta charset="utf-8">
-        <title>${escapeHtml(minute.title)}</title>
+        <title>${escapeHtml(minute.title)} - ${orgName}</title>
         <style>
-          body { font-family: 'Arial', sans-serif; color: #1e293b; line-height: 1.6; padding: 20px; }
-          .header { border-bottom: 3px solid ${primaryColor}; padding-bottom: 12px; margin-bottom: 24px; }
+          @page { size: auto; margin: 18mm 16mm; }
+          body { font-family: 'Arial', 'Helvetica Neue', sans-serif; color: #1e293b; line-height: 1.6; padding: 20px; max-width: 820px; margin: 0 auto; }
+          .header { border-bottom: 3px solid ${primaryColor}; padding-bottom: 12px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
           .inst-title { font-size: 18px; font-weight: bold; color: ${primaryColor}; margin: 0; text-transform: uppercase; }
           .inst-slogan { font-size: 12px; color: #64748b; font-style: italic; margin-top: 2px; }
-          .inst-header { font-size: 11px; font-weight: bold; color: #475569; letter-spacing: 1px; margin-top: 6px; }
-          h1 { font-size: 22px; color: #0f172a; margin-top: 15px; margin-bottom: 8px; }
+          .inst-header { font-size: 11px; font-weight: bold; color: #475569; letter-spacing: 1px; margin-bottom: 4px; }
+          .inst-meta { font-size: 11px; color: #64748b; text-align: right; }
+          h1 { font-size: 22px; color: #0f172a; margin-top: 15px; margin-bottom: 12px; }
           .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; background: #f8fafc; }
           .meta-table td { padding: 8px 12px; font-size: 12px; border: 1px solid #e2e8f0; }
           .label { font-weight: bold; color: #475569; width: 25%; }
-          .section-title { font-size: 14px; font-weight: bold; color: ${primaryColor}; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-top: 20px; }
+          .section-title { font-size: 14px; font-weight: bold; color: ${primaryColor}; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-top: 22px; page-break-after: avoid; }
           .content-box { font-size: 13px; line-height: 1.7; white-space: pre-line; margin-top: 8px; }
           .actions-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
-          .actions-table th { background: ${primaryColor}; color: white; padding: 8px; text-align: left; }
+          .actions-table th { background: ${primaryColor}; color: white; padding: 8px; text-align: left; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .actions-table td { padding: 8px; border: 1px solid #e2e8f0; }
-          .footer { margin-top: 40px; padding-top: 15px; border-top: 1px solid #cbd5e1; font-size: 11px; color: #94a3b8; text-align: center; }
+          .signatures { margin-top: 48px; display: flex; justify-content: space-between; gap: 40px; page-break-inside: avoid; }
+          .sig-box { flex: 1; text-align: center; border-top: 1px solid #94a3b8; padding-top: 8px; font-size: 11px; color: #475569; }
+          .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; text-align: center; }
         </style>
       </head>
       <body>
         <div class="header">
-          <div class="inst-header">${headerText}</div>
-          <div class="inst-title">${orgName}</div>
-          ${slogan ? `<div class="inst-slogan">"${slogan}"</div>` : ''}
+          <div>
+            <div class="inst-header">${headerText}</div>
+            <div class="inst-title">${orgName}</div>
+            ${slogan ? `<div class="inst-slogan">"${slogan}"</div>` : ''}
+          </div>
+          ${(taxId || address) ? `
+            <div class="inst-meta">
+              ${taxId ? `<div>RUT / ID: ${taxId}</div>` : ''}
+              ${address ? `<div>${address}</div>` : ''}
+            </div>
+          ` : ''}
         </div>
 
         <h1>${escapeHtml(minute.title)}</h1>
@@ -542,8 +556,19 @@ function generateMinuteHTML(minute: MeetingMinute, organization?: Organization):
           </table>
         ` : ''}
 
+        <div class="signatures">
+          <div class="sig-box">
+            <strong>Dirección / Presidencia</strong><br/>
+            ${orgName}
+          </div>
+          <div class="sig-box">
+            <strong>Secretaría de Actas</strong><br/>
+            Validación Institucional
+          </div>
+        </div>
+
         <div class="footer">
-          Acta oficial resguardada en Google Drive por PactaCloud Suite para ${orgName}.
+          Acta oficial generada por PactaCloud Suite para ${orgName}.
         </div>
       </body>
     </html>

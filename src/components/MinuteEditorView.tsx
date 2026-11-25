@@ -3,6 +3,7 @@ import { MeetingMinute, Attendee, ActionItem, DirectoryItem, MinuteStatus, Organ
 import { ContactPickerModal } from './ContactPickerModal';
 import { analyzeAndEnhanceMinute } from '../services/aiService';
 import { openGoogleCalendarEvent } from '../services/calendarService';
+import { exportMinuteToPdf } from '../services/pdfExportService';
 
 interface MinuteEditorViewProps {
   minute: MeetingMinute | null;
@@ -432,6 +433,34 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
             <option value="Aprobada">✅ Aprobada</option>
             <option value="Finalizada">🔒 Finalizada</option>
           </select>
+
+          <button
+            type="button"
+            onClick={() => {
+              const draftForPdf: MeetingMinute = {
+                id: minute?.id || 'draft-pdf',
+                title: title.trim() || 'Acta de Reunión',
+                directory,
+                date,
+                formattedDate: formatLocalDate(date),
+                time,
+                status,
+                objectives,
+                pointsTreated,
+                keyDecisions: pointsTreated.split('\n').filter((l) => l.trim().length > 0).slice(0, 4),
+                actionItems: actionItems.filter((a) => a.text.trim().length > 0),
+                attendees,
+                nextSessionDate,
+                syncCalendar
+              };
+              exportMinuteToPdf(draftForPdf, currentOrganization);
+            }}
+            className="px-3 py-2 rounded-xl border border-slate-200 hover:border-slate-400 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-all flex items-center gap-1 cursor-pointer"
+            title="Imprimir o guardar como PDF oficial con membrete"
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-rose-600">picture_as_pdf</span>
+            <span className="hidden sm:inline">PDF Oficial</span>
+          </button>
 
           {minute && (
             <>

@@ -13,9 +13,9 @@ import {
 } from '../services/googleDriveOAuthService';
 import {
   openGoogleCalendarEvent,
-  downloadIcsFile,
-  generateGoogleCalendarUrl
+  downloadIcsFile
 } from '../services/calendarService';
+import { exportMinuteToPdf } from '../services/pdfExportService';
 
 interface ExportShareModalProps {
   minute: MeetingMinute | null;
@@ -698,12 +698,22 @@ Dirección de ${orgName}`;
             Establecimiento: <strong className="text-slate-800">{orgName}</strong> ({targetDriveAccount})
           </span>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             <button
+              type="button"
               onClick={onClose}
               className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
             >
               Cerrar
+            </button>
+            <button
+              type="button"
+              onClick={() => exportMinuteToPdf(minute, currentOrganization)}
+              className="px-4 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Generar documento PDF oficial con membrete y firmas"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-rose-600">picture_as_pdf</span>
+              <span>PDF Oficial</span>
             </button>
             <button
               onClick={handleExport}
