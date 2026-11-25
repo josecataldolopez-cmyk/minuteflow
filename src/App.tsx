@@ -15,6 +15,7 @@ const InstitutionOnboardingModal = lazy(() => import('./components/InstitutionOn
 import { storageService } from './services/storageService';
 import { getSupabase, isSupabaseConfigured } from './services/supabaseClient';
 import { openGoogleCalendarEvent, downloadIcsFile } from './services/calendarService';
+import { clearOAuthSession } from './services/googleDriveOAuthService';
 import {
   MeetingMinute,
   ViewMode,
@@ -132,12 +133,15 @@ export default function App() {
     });
 
     // Listen to changes (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setIsAuthenticated(true);
         handleFetchUserProfileFromAuth(session.user.id, session.user.email || '');
       } else {
         setIsAuthenticated(false);
+        if (event === 'SIGNED_OUT') {
+          clearSessionData();
+        }
       }
     });
 
@@ -202,6 +206,40 @@ export default function App() {
     }
   };
 
+  const clearSessionData = () => {
+    try {
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith('minuteflow_'))
+        .forEach((k) => localStorage.removeItem(k));
+    } catch {
+      // Ignore storage errors
+    }
+    if (currentOrgId) {
+      clearOAuthSession(currentOrgId);
+    }
+    setNeedsInstitutionOnboarding(false);
+    setOrganizations([]);
+    setCurrentOrgId('');
+    setMinutes([]);
+    setActionItems([]);
+    setAllAttendees([]);
+    setDirectories([]);
+    setSchedule([]);
+    setActiveMinute(null);
+    setScheduledMinuteNotification(null);
+    setCurrentView('dashboard');
+    setUserProfile({
+      id: '',
+      name: 'Invitado',
+      email: '',
+      role: 'Lector',
+      systemRole: 'reader',
+      avatarUrl: '',
+      organizationId: '',
+      organizationName: 'PactaCloud',
+    });
+  };
+
   const handleSignOut = async () => {
     if (isSupabaseConfigured()) {
       const supabase = getSupabase();
@@ -210,13 +248,25 @@ export default function App() {
       }
     }
     setIsAuthenticated(false);
-    setNeedsInstitutionOnboarding(false);
-    showToast('Sesión cerrada exitosamente');
+    clearSessionData();
+    setIsAuthModalOpen(true);
+    showToast('Sesión cerrada y datos locales limpiados');
   };
 
   // Current Organization helper
-  const currentOrganization = useMemo(() => {
-    return organizations.find((o) => o.id === currentOrgId) || organizations[0] || INITIAL_ORGANIZATIONS[0];
+  const currentOrganization = useMemo<Organization>(() => {
+    return (
+      organizations.find((o) => o.id === currentOrgId) ||
+      organizations[0] || {
+        id: '',
+        name: 'PactaCloud',
+        code: 'PC',
+        domain: '',
+        driveAccount: '',
+        plan: 'FREE',
+        primaryColor: '#4f46e5',
+      }
+    );
   }, [organizations, currentOrgId]);
 
   // User Profile State with local storage
