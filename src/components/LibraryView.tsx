@@ -54,9 +54,20 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
   // Filter minutes
+  const normalizeStatus = (s: string) => {
+    const lower = s.toLowerCase();
+    if (lower === 'approved' || lower === 'aprobada') return 'aprobada';
+    if (lower === 'draft' || lower === 'borrador') return 'borrador';
+    if (lower === 'pending review' || lower === 'pendiente' || lower === 'en revisión') return 'pendiente';
+    return lower;
+  };
+
   const filteredMinutes = minutes.filter((minute) => {
     const matchesDir = selectedDirectory ? minute.directory === selectedDirectory : true;
-    const matchesTag = selectedTag === 'All' ? true : minute.status === selectedTag;
+    const matchesTag =
+      selectedTag === 'All'
+        ? true
+        : normalizeStatus(minute.status) === normalizeStatus(selectedTag);
     return matchesDir && matchesTag;
   });
 

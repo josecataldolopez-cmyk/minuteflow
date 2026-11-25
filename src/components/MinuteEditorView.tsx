@@ -289,6 +289,19 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
     setAttendees(attendees.filter((a) => a.id !== attId));
   };
 
+  const formatLocalDate = (dateStr: string) => {
+    const parts = dateStr.split('-').map(Number);
+    const localDate =
+      parts.length === 3 && parts.every((n) => !isNaN(n))
+        ? new Date(parts[0], parts[1] - 1, parts[2])
+        : new Date(dateStr);
+    return localDate.toLocaleDateString('es-ES', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
   const handleSave = (isDraft: boolean) => {
     const finalStatus: MinuteStatus = isDraft ? 'Borrador' : status === 'Borrador' ? 'Aprobada' : status;
     const updatedMinute: MeetingMinute = {
@@ -296,11 +309,7 @@ export const MinuteEditorView: React.FC<MinuteEditorViewProps> = ({
       title: title.trim() || 'Acta de Reunión Sin Título',
       directory,
       date,
-      formattedDate: new Date(date).toLocaleDateString('es-ES', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      }),
+      formattedDate: formatLocalDate(date),
       time,
       status: finalStatus,
       objectives,

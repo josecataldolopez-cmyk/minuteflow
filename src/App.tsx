@@ -275,15 +275,11 @@ export default function App() {
   }, [currentOrgId]);
 
   useEffect(() => {
-    storageService.saveMinutes(minutes).then((res) => {
-      if (!res.success && res.error) showToast(`Error al sincronizar actas en nube: ${res.error}`);
-    });
+    storageService.saveMinutesLocal(minutes);
   }, [minutes]);
 
   useEffect(() => {
-    storageService.saveActionItems(actionItems).then((res) => {
-      if (!res.success && res.error) showToast(`Error al sincronizar compromisos en nube: ${res.error}`);
-    });
+    storageService.saveActionItemsLocal(actionItems);
   }, [actionItems]);
 
   useEffect(() => {
@@ -494,6 +490,13 @@ export default function App() {
     }));
     setActionItems([...newActionsFromMinute, ...otherActions]);
 
+    // Guardado granular atómico en Supabase (solo esta acta y sus compromisos)
+    storageService.saveSingleMinute(minuteWithOrg, newActionsFromMinute).then((res) => {
+      if (!res.success && res.error) {
+        showToast(`Error al sincronizar acta en nube: ${res.error}`);
+      }
+    });
+
     // Abrir Google Calendar si el usuario activó la casilla de próxima sesión
     if (minuteWithOrg.syncCalendar && minuteWithOrg.nextSessionDate) {
       setScheduledMinuteNotification(minuteWithOrg);
@@ -521,9 +524,17 @@ export default function App() {
   };
 
   const handleDuplicateMinute = (minuteToDup: MeetingMinute) => {
+    const newId = `min-${Date.now()}`;
+    const duplicatedActions = minuteToDup.actionItems.map((act, idx) => ({
+      ...act,
+      id: `act-${Date.now()}-${idx}`,
+      sourceMinuteId: newId,
+      sourceMinuteTitle: `${minuteToDup.title} (Copia)`,
+      organizationId: currentOrgId
+    }));
     const duplicated: MeetingMinute = {
       ...minuteToDup,
-      id: `min-${Date.now()}`,
+      id: newId,
       title: `${minuteToDup.title} (Copia)`,
       date: new Date().toISOString().split('T')[0],
       formattedDate: new Date().toLocaleDateString('es-ES', {
@@ -533,22 +544,35 @@ export default function App() {
       }),
       status: 'Borrador',
       lastEdited: 'Justo ahora',
-      organizationId: currentOrgId
+      organizationId: currentOrgId,
+      actionItems: duplicatedActions
     };
     setMinutes((prev) => [duplicated, ...prev]);
+    setActionItems((prev) => [...duplicatedActions, ...prev]);
+    storageService.saveSingleMinute(duplicated, duplicatedActions).then((res) => {
+      if (!res.success && res.error) {
+        showToast(`Error al duplicar acta en nube: ${res.error}`);
+      }
+    });
     showToast(`Acta duplicada como borrador en ${currentOrganization.name}`);
   };
 
   const handleDeleteSampleMinutes = () => {
+    const toRemove = minutes.filter(
+      (m) => (m.organizationId || 'org-redq') === currentOrgId && m.id.startsWith('min-')
+    );
     setMinutes((prev) =>
       prev.filter((m) => (m.organizationId || 'org-redq') !== currentOrgId || !m.id.startsWith('min-'))
     );
+    Promise.all(toRemove.map((m) => storageService.deleteMinute(m.id)));
     showToast(`Actas de muestra eliminadas para ${currentOrganization.name}`);
   };
 
   const handleClearAllMinutes = () => {
+    const toRemove = minutes.filter((m) => (m.organizationId || 'org-redq') === currentOrgId);
     setMinutes((prev) => prev.filter((m) => (m.organizationId || 'org-redq') !== currentOrgId));
     setActionItems((prev) => prev.filter((a) => (a.organizationId || 'org-redq') !== currentOrgId));
+    Promise.all(toRemove.map((m) => storageService.deleteMinute(m.id)));
     showToast(`Todas las actas de ${currentOrganization.name} fueron eliminadas`);
   };
 
@@ -561,11 +585,34 @@ export default function App() {
 
   // Action Items Operations
   const handleToggleActionItem = (id: string) => {
+    const target = actionItems.find((item) => item.id === id);
+    if (!target) return;
+
+    const updatedItem: ActionItem = { ...target, completed: !target.completed };
+
     setActionItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, completed: !item.completed } : item
+      prev.map((item) => (item.id === id ? updatedItem : item))
+    );
+
+    // Mantener consistencia bidireccional dentro de minute.actionItems (FUN-02)
+    setMinutes((prev) =>
+      prev.map((m) =>
+        m.id === target.sourceMinuteId
+          ? {
+              ...m,
+              actionItems: m.actionItems.map((act) =>
+                act.id === id ? { ...act, completed: updatedItem.completed } : act
+              )
+            }
+          : m
       )
     );
+
+    storageService.saveSingleActionItem(updatedItem).then((res) => {
+      if (!res.success && res.error) {
+        showToast(`Error al actualizar compromiso en nube: ${res.error}`);
+      }
+    });
   };
 
   const handleAddActionItem = (
@@ -596,7 +643,13 @@ export default function App() {
       };
     }
     setActionItems((prev) => [newItem, ...prev]);
-    showToast('Nueva tarea añadida a los compromisos');
+    storageService.saveSingleActionItem(newItem).then((res) => {
+      if (!res.success && res.error) {
+        showToast(`Error al guardar compromiso en nube: ${res.error}`);
+      } else {
+        showToast('Nueva tarea añadida a los compromisos');
+      }
+    });
   };
 
   // Contact / Directory Operations
