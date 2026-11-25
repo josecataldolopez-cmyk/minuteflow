@@ -119,21 +119,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <button
           onClick={() => onNavigate('editor')}
-          id="nav-projects"
-          style={(currentView === 'editor' || currentView === 'projects') ? { color: primaryColor, backgroundColor: `${primaryColor}14` } : undefined}
+          id="nav-editor"
+          style={currentView === 'editor' ? { color: primaryColor, backgroundColor: `${primaryColor}14` } : undefined}
           className={`flex items-center gap-3.5 px-4 py-2.5 rounded-xl transition-all text-left cursor-pointer ${
-            currentView === 'editor' || currentView === 'projects'
+            currentView === 'editor'
               ? 'font-bold shadow-xs'
               : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
           }`}
         >
           <span
-            className={`material-symbols-outlined text-[22px] ${(currentView === 'editor' || currentView === 'projects') ? 'material-symbols-fill' : 'text-slate-400'}`}
-            style={(currentView === 'editor' || currentView === 'projects') ? { color: primaryColor } : undefined}
+            className={`material-symbols-outlined text-[22px] ${currentView === 'editor' ? 'material-symbols-fill' : 'text-slate-400'}`}
+            style={currentView === 'editor' ? { color: primaryColor } : undefined}
           >
-            folder_shared
+            edit_document
           </span>
-          <span>Proyectos</span>
+          <span>Editor de Actas</span>
         </button>
 
         <button

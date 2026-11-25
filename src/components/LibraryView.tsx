@@ -52,6 +52,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const [minuteToDelete, setMinuteToDelete] = useState<MeetingMinute | null>(null);
   const [showDeleteSampleModal, setShowDeleteSampleModal] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 18;
 
   // Filter minutes
   const normalizeStatus = (s: string) => {
@@ -70,6 +72,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         : normalizeStatus(minute.status) === normalizeStatus(selectedTag);
     return matchesDir && matchesTag;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredMinutes.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedMinutes = filteredMinutes.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const handleSelectAll = () => {
     if (selectedMinuteIds.length === filteredMinutes.length) {
@@ -554,7 +560,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               </div>
             ) : viewFormat === 'card' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {filteredMinutes.map((minute) => {
+                {paginatedMinutes.map((minute) => {
                   const isSelected = selectedMinuteIds.includes(minute.id);
                   return (
                     <div
@@ -751,7 +757,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredMinutes.map((minute) => (
+                    {paginatedMinutes.map((minute) => (
                       <tr
                         key={minute.id}
                         onClick={() => onSelectMinute(minute)}
@@ -805,6 +811,38 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* Pagination Bar (ARCH-01) */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-100 text-xs text-slate-600">
+                <span>
+                  Mostrando <strong>{(safePage - 1) * PAGE_SIZE + 1}</strong>–
+                  <strong>{Math.min(safePage * PAGE_SIZE, filteredMinutes.length)}</strong> de{' '}
+                  <strong>{filteredMinutes.length}</strong> actas
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={safePage <= 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer font-semibold"
+                  >
+                    Anterior
+                  </button>
+                  <span className="px-2 font-bold text-slate-800">
+                    Página {safePage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={safePage >= totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer font-semibold"
+                  >
+                    Siguiente
+                  </button>
+                </div>
               </div>
             )}
           </div>

@@ -1,15 +1,16 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { TopAppBar } from './components/TopAppBar';
 import { DashboardView } from './components/DashboardView';
-import { LibraryView } from './components/LibraryView';
-import { MinuteEditorView } from './components/MinuteEditorView';
-import { ExportShareModal } from './components/ExportShareModal';
-import { SettingsView } from './components/SettingsView';
-import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
-import { AuthModal } from './components/AuthModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Toast } from './components/Toast';
+
+const LibraryView = lazy(() => import('./components/LibraryView').then((m) => ({ default: m.LibraryView })));
+const MinuteEditorView = lazy(() => import('./components/MinuteEditorView').then((m) => ({ default: m.MinuteEditorView })));
+const ExportShareModal = lazy(() => import('./components/ExportShareModal').then((m) => ({ default: m.ExportShareModal })));
+const SettingsView = lazy(() => import('./components/SettingsView').then((m) => ({ default: m.SettingsView })));
+const PrivacyPolicyModal = lazy(() => import('./components/PrivacyPolicyModal').then((m) => ({ default: m.PrivacyPolicyModal })));
+const AuthModal = lazy(() => import('./components/AuthModal').then((m) => ({ default: m.AuthModal })));
 import { storageService } from './services/storageService';
 import { getSupabase, isSupabaseConfigured } from './services/supabaseClient';
 import { openGoogleCalendarEvent, downloadIcsFile } from './services/calendarService';
@@ -762,87 +763,96 @@ export default function App() {
         />
 
         {/* Dynamic Views (Strictly scoped by organization) */}
-        {currentView === 'dashboard' && (
-          <DashboardView
-            schedule={scopedSchedule}
-            actionItems={scopedActionItems}
-            recentMinutes={scopedMinutes}
-            allAttendees={scopedAttendees}
-            onToggleActionItem={handleToggleActionItem}
-            onAddActionItem={handleAddActionItem}
-            onSelectMinute={handleSelectMinute}
-            onOpenExport={handleOpenExport}
-            onNewMinute={handleNewMinute}
-            onNavigate={(v) => setCurrentView(v)}
-            userProfile={userProfile}
-          />
-        )}
+        <ErrorBoundary fallbackTitle="Inconveniente en la vista principal">
+          <Suspense
+            fallback={
+              <div className="flex-1 flex items-center justify-center p-12 text-slate-500 gap-3">
+                <span className="material-symbols-outlined animate-spin text-indigo-600">progress_activity</span>
+                <span className="text-sm font-medium">Cargando módulo...</span>
+              </div>
+            }
+          >
+            {currentView === 'dashboard' && (
+              <DashboardView
+                schedule={scopedSchedule}
+                actionItems={scopedActionItems}
+                recentMinutes={scopedMinutes}
+                allAttendees={scopedAttendees}
+                onToggleActionItem={handleToggleActionItem}
+                onAddActionItem={handleAddActionItem}
+                onSelectMinute={handleSelectMinute}
+                onOpenExport={handleOpenExport}
+                onNewMinute={handleNewMinute}
+                onNavigate={(v) => setCurrentView(v)}
+                userProfile={userProfile}
+              />
+            )}
 
-        {currentView === 'library' && (
-          <LibraryView
-            minutes={scopedMinutes}
-            directories={scopedDirectories}
-            onSelectMinute={handleSelectMinute}
-            onOpenExport={handleOpenExport}
-            onDeleteMinute={handleDeleteMinute}
-            onDuplicateMinute={handleDuplicateMinute}
-            onNewMinute={handleNewMinute}
-            onCreateDirectory={handleCreateDirectory}
-            onUpdateDirectory={handleUpdateDirectory}
-            onDeleteDirectory={handleDeleteDirectory}
-            onDeleteSampleMinutes={handleDeleteSampleMinutes}
-            onClearAllMinutes={handleClearAllMinutes}
-            onResetSampleMinutes={handleResetSampleMinutes}
-            userRole={userProfile.systemRole}
-          />
-        )}
+            {currentView === 'library' && (
+              <LibraryView
+                minutes={scopedMinutes}
+                directories={scopedDirectories}
+                onSelectMinute={handleSelectMinute}
+                onOpenExport={handleOpenExport}
+                onDeleteMinute={handleDeleteMinute}
+                onDuplicateMinute={handleDuplicateMinute}
+                onNewMinute={handleNewMinute}
+                onCreateDirectory={handleCreateDirectory}
+                onUpdateDirectory={handleUpdateDirectory}
+                onDeleteDirectory={handleDeleteDirectory}
+                onDeleteSampleMinutes={handleDeleteSampleMinutes}
+                onClearAllMinutes={handleClearAllMinutes}
+                onResetSampleMinutes={handleResetSampleMinutes}
+                userRole={userProfile.systemRole}
+              />
+            )}
 
-        {(currentView === 'editor' || currentView === 'projects') && (
-          <MinuteEditorView
-            minute={activeMinute}
-            directories={scopedDirectories}
-            onSave={handleSaveMinute}
-            onOpenExport={handleOpenExport}
-            onBack={() => setCurrentView('library')}
-            allAttendees={scopedAttendees}
-            onCreateContact={handleCreateContact}
-            onUpdateContact={handleUpdateContact}
-            onDeleteContact={handleDeleteContact}
-            onCreateDirectory={handleCreateDirectory}
-            onDeleteMinute={handleDeleteMinute}
-            currentOrganization={currentOrganization}
-            userRole={userProfile.systemRole}
-          />
-        )}
+            {(currentView === 'editor' || currentView === 'projects') && (
+              <MinuteEditorView
+                minute={activeMinute}
+                directories={scopedDirectories}
+                onSave={handleSaveMinute}
+                onOpenExport={handleOpenExport}
+                onBack={() => setCurrentView('library')}
+                allAttendees={scopedAttendees}
+                onCreateContact={handleCreateContact}
+                onUpdateContact={handleUpdateContact}
+                onDeleteContact={handleDeleteContact}
+                onCreateDirectory={handleCreateDirectory}
+                onDeleteMinute={handleDeleteMinute}
+                currentOrganization={currentOrganization}
+                userRole={userProfile.systemRole}
+              />
+            )}
 
-        {currentView === 'settings' && (
-          <ErrorBoundary fallbackTitle="Inconveniente al cargar Configuración">
-            <SettingsView
-              onShowToast={showToast}
-              userProfile={userProfile}
-              onUpdateUserProfile={handleUpdateUserProfile}
-              allAttendees={scopedAttendees}
-              onCreateContact={handleCreateContact}
-              onUpdateContact={handleUpdateContact}
-              onDeleteContact={handleDeleteContact}
-              onResetContacts={handleResetContacts}
-              directories={scopedDirectories}
-              onCreateDirectory={handleCreateDirectory}
-              onUpdateDirectory={handleUpdateDirectory}
-              onDeleteDirectory={handleDeleteDirectory}
-              onResetDirectories={handleResetDirectories}
-              minutesCount={scopedMinutes.length}
-              onDeleteSampleMinutes={handleDeleteSampleMinutes}
-              onClearAllMinutes={handleClearAllMinutes}
-              onResetSampleMinutes={handleResetSampleMinutes}
-              currentOrganization={currentOrganization}
-              onUpdateOrganization={handleUpdateOrganization}
-              userRole={userProfile.systemRole}
-              hasMultipleOrgs={organizations.length > 1}
-              onPurgeDemoOrganizations={handlePurgeDemoOrganizations}
-            />
-          </ErrorBoundary>
-        )}
+            {currentView === 'settings' && (
+              <SettingsView
+                onShowToast={showToast}
+                userProfile={userProfile}
+                onUpdateUserProfile={handleUpdateUserProfile}
+                allAttendees={scopedAttendees}
+                onCreateContact={handleCreateContact}
+                onUpdateContact={handleUpdateContact}
+                onDeleteContact={handleDeleteContact}
+                onResetContacts={handleResetContacts}
+                directories={scopedDirectories}
+                onCreateDirectory={handleCreateDirectory}
+                onUpdateDirectory={handleUpdateDirectory}
+                onDeleteDirectory={handleDeleteDirectory}
+                onResetDirectories={handleResetDirectories}
+                minutesCount={scopedMinutes.length}
+                onDeleteSampleMinutes={handleDeleteSampleMinutes}
+                onClearAllMinutes={handleClearAllMinutes}
+                onResetSampleMinutes={handleResetSampleMinutes}
+                currentOrganization={currentOrganization}
+                onUpdateOrganization={handleUpdateOrganization}
+                userRole={userProfile.systemRole}
+                hasMultipleOrgs={organizations.length > 1}
+                onPurgeDemoOrganizations={handlePurgeDemoOrganizations}
+              />
+            )}
+          </Suspense>
+        </ErrorBoundary>
 
         {/* Mobile Bottom Navigation Bar */}
         <nav className="md:hidden w-full h-16 bg-white border-t border-slate-200/80 flex justify-around items-center px-2 flex-shrink-0 z-30 pb-1 shadow-xs">
@@ -903,48 +913,50 @@ export default function App() {
         </nav>
       </div>
 
-      {/* Export / Sincronización Modal (Scoped by Organization) */}
-      <ExportShareModal
-        minute={exportTargetMinute}
-        isOpen={exportModalOpen}
-        onClose={() => {
-          setExportModalOpen(false);
-          setExportTargetMinute(null);
-        }}
-        onExportSuccess={(channel) => {
-          showToast(`Acta enviada con éxito vía ${channel}`);
-        }}
-        currentOrganization={currentOrganization}
-        directories={scopedDirectories}
-        onCreateDirectory={handleCreateDirectory}
-      />
+      <Suspense fallback={null}>
+        {/* Export / Sincronización Modal (Scoped by Organization) */}
+        <ExportShareModal
+          minute={exportTargetMinute}
+          isOpen={exportModalOpen}
+          onClose={() => {
+            setExportModalOpen(false);
+            setExportTargetMinute(null);
+          }}
+          onExportSuccess={(channel) => {
+            showToast(`Acta enviada con éxito vía ${channel}`);
+          }}
+          currentOrganization={currentOrganization}
+          directories={scopedDirectories}
+          onCreateDirectory={handleCreateDirectory}
+        />
 
-      {/* Supabase Authentication & Multi-Tenant Onboarding Modal */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        availableOrganizations={organizations}
-        onAuthSuccess={(userEmail, orgId) => {
-          setIsAuthenticated(true);
-          showToast(`¡Bienvenido a PactaCloud, ${userEmail}!`);
-          if (orgId) {
-            setCurrentOrgId(orgId);
-            localStorage.setItem('minuteflow_current_org_id', orgId);
-          }
-        }}
-      />
+        {/* Supabase Authentication & Multi-Tenant Onboarding Modal */}
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          availableOrganizations={organizations}
+          onAuthSuccess={(userEmail, orgId) => {
+            setIsAuthenticated(true);
+            showToast(`¡Bienvenido a PactaCloud, ${userEmail}!`);
+            if (orgId) {
+              setCurrentOrgId(orgId);
+              localStorage.setItem('minuteflow_current_org_id', orgId);
+            }
+          }}
+        />
 
-      {/* Legal & Privacy Compliance Modal */}
-      <PrivacyPolicyModal
-        isOpen={isPrivacyModalOpen}
-        onClose={() => {
-          setIsPrivacyModalOpen(false);
-          if (window.location.hash) {
-            history.replaceState(null, '', window.location.pathname);
-          }
-        }}
-        defaultTab={privacyModalTab}
-      />
+        {/* Legal & Privacy Compliance Modal */}
+        <PrivacyPolicyModal
+          isOpen={isPrivacyModalOpen}
+          onClose={() => {
+            setIsPrivacyModalOpen(false);
+            if (window.location.hash) {
+              history.replaceState(null, '', window.location.pathname);
+            }
+          }}
+          defaultTab={privacyModalTab}
+        />
+      </Suspense>
 
       {/* Floating Google Calendar Notification Banner */}
       {scheduledMinuteNotification && (

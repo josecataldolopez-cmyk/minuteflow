@@ -115,6 +115,8 @@ export function downloadIcsFile(minute: MeetingMinute, organizationName?: string
 
   const attendeeLines = guestEmails.map((email) => `ATTENDEE;ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:${escapeIcsEmail(email)}`).join('\r\n');
 
+  const dtstamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
   const icsLines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -123,7 +125,7 @@ export function downloadIcsFile(minute: MeetingMinute, organizationName?: string
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
     `UID:pactacloud-${minute.id}-${Date.now()}@pactacloud.vercel.app`,
-    `DTSTAMP:${start}Z`,
+    `DTSTAMP:${dtstamp}`,
     `DTSTART:${start}`,
     `DTEND:${end}`,
     `SUMMARY:${escapeIcsText(`Próxima Sesión: ${minute.title} (${org})`)}`,
